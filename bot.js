@@ -2,7 +2,7 @@ const Discord = require('discord.js');
 const auth = require('./auth.json');
 
 var watashiSearch = /(?<![a-zA-Z])You(?![a-zA-Z])/gm;
-var animeChannelID = "259185701294178304";
+var animeChannelID = "";
 var mentionSearch;
 var commandSearch = /^!yousoro(?:$| (.+))/
 
