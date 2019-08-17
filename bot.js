@@ -2,7 +2,7 @@ const Discord = require('discord.js');
 const auth = require('./auth.json');
 
 var watashiSearch = /(?<![a-zA-Z])You(?![a-zA-Z])/gm;
-var animeChannelID = "";
+var animeChannelID = new Map();
 var mentionSearch;
 var commandSearch = /^!yousoro(?:$| (.+))/
 
@@ -23,7 +23,7 @@ function yousoroInfo(channel) {
 }
 
 function yousoroHere(channel) {
-    animeChannelID = channel.id;
+    animeChannelID.set(channel.guild.id, channel.id);
     channel.send("Yousoro~!", {
         files: [{
             attachment: "yousoroHere.png"
@@ -32,7 +32,7 @@ function yousoroHere(channel) {
 }
 
 function yousoroEverywhere(channel) {
-    animeChannelID = "";
+    animeChannelID.set(channel.guild.id, "");
     channel.send("Zensokuzenshin... Yousoro~!", {
         files: [{
             attachment: "yousoroEverywhere.jpg"
@@ -60,6 +60,14 @@ bot.on('ready', () => {
     mentionSearch = new RegExp("@" + bot.user.id, 'gm');
 });
 
+bot.on('guildCreate', guild => {
+    animeChannelID.set(guild.id, "");
+});
+
+bot.on('guildDelete', guild => {
+    animeChannelID.delete(guild.id);
+})
+
 bot.on('message', message => {
     var content = message.content;
     var command = content.match(commandSearch);
@@ -82,7 +90,7 @@ bot.on('message', message => {
         }
     } else if (message.author.id != bot.user.id) {
         if (content.search(watashiSearch) > -1) {
-            if (animeChannelID == "" || channel.id == animeChannelID) {
+            if (animeChannelID.get(message.guild.id) == "" || animeChannelID.get(message.guild.id) == message.channel.id) {
                 watashi(channel);
             }
         }
