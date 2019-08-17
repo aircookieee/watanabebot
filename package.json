@@ -1,0 +1,11 @@
+{
+    "name": "You-chan",
+    "version": "0.0.02",
+    "description": "Yousoro~!",
+    "author": "gyroknight",
+    "dependencies": {
+        "discord.js": "^11.5.1",
+        "erlpack": "github:hammerandchisel/erlpack",
+        "fs": "0.0.1-security"
+    }
+}
