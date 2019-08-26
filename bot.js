@@ -1,10 +1,25 @@
 const Discord = require('discord.js');
 const auth = require('./auth.json');
+const fs = require('fs');
 
 var watashiSearch = /(?<![a-zA-Z])You(?![a-zA-Z])/gm;
-var animeChannelID = new Map();
+var animeChannelID;
 var mentionSearch;
 var commandSearch = /^!yousoro(?:$| (.+))/
+var databasePath = 'database.json';
+
+try {
+    var database = fs.readFileSync(databasePath);
+    animeChannelID = JSON.parse(database);
+} catch (err) {
+    if (err.code = 'ENOENT') {
+        var fd = fs.openSync(databasePath, 'w+');
+        fs.closeSync(fd);
+        animeChannelID = {};
+    } else {
+        throw err;
+    }
+}
 
 function watashi(channel) {
     channel.send("Watashi?", {
@@ -23,7 +38,8 @@ function yousoroInfo(channel) {
 }
 
 function yousoroHere(channel) {
-    animeChannelID.set(channel.guild.id, channel.id);
+    animeChannelID[channel.guild.id] = channel.id;
+    writeDatabase();
     channel.send("Yousoro~!", {
         files: [{
             attachment: "yousoroHere.png"
@@ -32,10 +48,19 @@ function yousoroHere(channel) {
 }
 
 function yousoroEverywhere(channel) {
-    animeChannelID.set(channel.guild.id, "");
+    animeChannelID[channel.guild.id] = "";
+    writeDatabase();
     channel.send("Zensokuzenshin... Yousoro~!", {
         files: [{
             attachment: "yousoroEverywhere.jpg"
+        }]
+    });
+}
+
+function yousoroDMs(channel) {
+    channel.send("Yousor- hey, wait a sec, this isn't a Discord server...", {
+        files: [{
+            attachment: "dms.png"
         }]
     });
 }
@@ -48,6 +73,10 @@ function nosoro(channel) {
     });
 }
 
+function writeDatabase() {
+    fs.writeFileSync(databasePath, JSON.stringify(animeChannelID));
+}
+
 // Initialize Discord Bot
 var bot = new Discord.Client();
 
@@ -58,23 +87,33 @@ bot.on('ready', () => {
     console.log('Logged in as: ');
     console.log(bot.user.username + ' - (' + bot.user.id + ')');
     mentionSearch = new RegExp("@" + bot.user.id, 'gm');
+    for (const guild of bot.guilds.array()) {
+        if (animeChannelID[guild.id] == null) {
+            animeChannelID[guild.id] = "";
+            writeDatabase();
+        }
+    }
 });
 
 bot.on('guildCreate', guild => {
-    animeChannelID.set(guild.id, "");
+    animeChannelID[guild.id] = "";
+    writeDatabase();
 });
 
 bot.on('guildDelete', guild => {
-    animeChannelID.delete(guild.id);
+    delete animeChannelID[guild.id];
+    writeDatabase();
 })
 
 bot.on('message', message => {
     var content = message.content;
     var command = content.match(commandSearch);
-    var channel= message.channel;
+    var channel = message.channel;
 
     if (command != null) {
-        if (command[0] == "!yousoro") {
+        if (message.guild == null) {
+            yousoroDMs(channel);
+        } else if (command[0] == "!yousoro") {
             yousoroInfo(channel);
         } else if (message.member.hasPermission('ADMINISTRATOR') && command.length >= 2) {
             var arg = command[1];
@@ -90,7 +129,7 @@ bot.on('message', message => {
         }
     } else if (message.author.id != bot.user.id) {
         if (content.search(watashiSearch) > -1) {
-            if (animeChannelID.get(message.guild.id) == "" || animeChannelID.get(message.guild.id) == message.channel.id) {
+            if (message.guild == null || animeChannelID[message.guild.id] == "" || animeChannelID[message.guild.id] == message.channel.id) {
                 watashi(channel);
             }
         }
