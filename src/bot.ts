@@ -10,6 +10,7 @@ let animeChannelID: {
 let mentionSearch: RegExp;
 let commandSearch = /^!yousoro(?:$| (.+))/;
 let databasePath = "database.json";
+let bot: Discord.Client;
 
 try {
   let database = fs.readFileSync(databasePath).toString();
@@ -24,79 +25,107 @@ try {
   }
 }
 
-function watashi(channel: Discord.TextChannel | Discord.DMChannel) {
-  channel.send("Watashi?", {
-    files: [
-      {
-        attachment: "resources/watashi.jpg",
-      },
-    ],
-  });
-}
-
-function yousoroInfo(channel: Discord.TextChannel) {
-  channel.send(
-    "Yousoro, sailor!\n\nI can `!yousoro here` or `!yousoro everywhere`.",
-    {
+function watashi(channel: Discord.TextChannel | Discord.DMChannel): void {
+  if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
+  channel
+    .send("Watashi?", {
       files: [
         {
-          attachment: "resources/ohayousoro.png",
+          attachment: "resources/watashi.jpg",
         },
       ],
-    }
-  );
+    })
+    .catch();
 }
 
-function yousoroHere(channel: Discord.TextChannel) {
-  animeChannelID[channel.guild.id] = channel.id;
-  writeDatabase();
-  channel.send("Yousoro~!", {
-    files: [
-      {
-        attachment: "resources/yousoroHere.png",
-      },
-    ],
-  });
+function yousoroInfo(channel: Discord.TextChannel): void {
+  if (canSend(channel)) {
+    channel
+      .send(
+        "Yousoro, sailor!\n\nI can `!yousoro here` or `!yousoro everywhere`.",
+        {
+          files: [
+            {
+              attachment: "resources/ohayousoro.png",
+            },
+          ],
+        }
+      )
+      .catch();
+  }
 }
 
-function yousoroEverywhere(channel: Discord.TextChannel) {
-  animeChannelID[channel.guild.id] = "";
-  writeDatabase();
-  channel.send("Zensokuzenshin... Yousoro~!", {
-    files: [
-      {
-        attachment: "resources/yousoroEverywhere.jpg",
-      },
-    ],
-  });
+function yousoroHere(channel: Discord.TextChannel): void {
+  if (canSend(channel)) {
+    animeChannelID[channel.guild.id] = channel.id;
+    writeDatabase();
+    channel
+      .send("Yousoro~!", {
+        files: [
+          {
+            attachment: "resources/yousoroHere.png",
+          },
+        ],
+      })
+      .catch();
+  }
 }
 
-function yousoroDMs(channel: Discord.DMChannel) {
-  channel.send("Yousor- hey, wait a sec, this isn't a Discord server...", {
-    files: [
-      {
-        attachment: "resources/dms.png",
-      },
-    ],
-  });
+function yousoroEverywhere(channel: Discord.TextChannel): void {
+  if (canSend(channel)) {
+    animeChannelID[channel.guild.id] = "";
+    writeDatabase();
+    channel
+      .send("Zensokuzenshin... Yousoro~!", {
+        files: [
+          {
+            attachment: "resources/yousoroEverywhere.jpg",
+          },
+        ],
+      })
+      .catch();
+  }
 }
 
-function nosoro(channel: Discord.TextChannel | Discord.DMChannel) {
-  channel.send({
-    files: [
-      {
-        attachment: "resources/nosoro.gif",
-      },
-    ],
-  });
+function yousoroDMs(channel: Discord.DMChannel): void {
+  channel
+    .send("Yousor- hey, wait a sec, this isn't a Discord server...", {
+      files: [
+        {
+          attachment: "resources/dms.png",
+        },
+      ],
+    })
+    .catch();
 }
 
-function writeDatabase() {
+function nosoro(channel: Discord.TextChannel | Discord.DMChannel): void {
+  if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
+  channel
+    .send({
+      files: [
+        {
+          attachment: "resources/nosoro.gif",
+        },
+      ],
+    })
+    .catch();
+}
+
+function canSend(channel: Discord.TextChannel): boolean {
+  let ret: boolean | undefined;
+  if (bot instanceof Discord.Client && bot.user)
+    ret = channel.permissionsFor(bot.user)?.has("SEND_MESSAGES");
+
+  return ret ? ret : false;
+}
+
+function writeDatabase(): void {
   fs.writeFileSync(databasePath, JSON.stringify(animeChannelID));
 }
 
 // Initialize Discord Bot
-let bot = new Discord.Client();
+bot = new Discord.Client();
 
 bot.login(auth.token);
 
