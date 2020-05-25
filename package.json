@@ -1,11 +1,17 @@
 {
     "name": "You-chan",
-    "version": "0.0.02",
+    "version": "0.5.0",
     "description": "Yousoro~!",
     "author": "gyroknight",
     "dependencies": {
-        "discord.js": "^11.5.1",
+        "@types/node": "^14.0.5",
+        "discord.js": "^12.2.0",
         "erlpack": "github:hammerandchisel/erlpack",
-        "fs": "0.0.1-security"
+        "fs": "0.0.1-security",
+        "tsc": "^1.20150623.0",
+        "typescript": "^3.9.3"
+    },
+    "scripts": {
+        "tsc": "tsc"
     }
 }
