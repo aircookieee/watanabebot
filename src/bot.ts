@@ -3,7 +3,8 @@ import fs = require("fs");
 
 const auth = require("./auth.json");
 
-let watashiSearch = /(?<![a-zA-Z])You(?![a-zA-Z])/gm;
+let watashiSearch = /(?<![a-zA-Z])You(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
+let smolWatashiSearch = /(?<![a-zA-Z])you-chan(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
 let animeChannelID: {
   [guildID: string]: string;
 };
@@ -32,6 +33,19 @@ function watashi(channel: Discord.TextChannel | Discord.DMChannel): void {
       files: [
         {
           attachment: "resources/watashi.jpg",
+        },
+      ],
+    })
+    .catch();
+}
+
+function smolWatashi(channel: Discord.TextChannel | Discord.DMChannel): void {
+  if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
+  channel
+    .send("ʷᵃᵗᵃˢʰᶦˀ", {
+      files: [
+        {
+          attachment: "resources/smolsoro.png",
         },
       ],
     })
@@ -188,13 +202,15 @@ bot.on("message", (message) => {
       nosoro(channel);
     }
   } else if (message.author.id != bot.user?.id) {
-    if (content.search(watashiSearch) > -1) {
-      if (
-        !message.guild ||
-        animeChannelID[message.guild.id] == "" ||
-        animeChannelID[message.guild.id] == message.channel.id
-      ) {
+    if (
+      !message.guild ||
+      animeChannelID[message.guild.id] == "" ||
+      animeChannelID[message.guild.id] == message.channel.id
+    ) {
+      if (content.search(watashiSearch) > -1) {
         watashi(channel);
+      } else if (content.search(smolWatashiSearch) > -1) {
+        smolWatashi(channel);
       }
     }
 
