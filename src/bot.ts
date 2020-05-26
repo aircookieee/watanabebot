@@ -157,6 +157,9 @@ bot.on("message", (message) => {
   let command = content.match(commandSearch);
   let channel: Discord.TextChannel | Discord.DMChannel | undefined;
 
+  // Check if user is bot, skip if it is
+  if (message.author.bot) return;
+
   if (
     message.channel instanceof Discord.TextChannel ||
     message.channel instanceof Discord.DMChannel
