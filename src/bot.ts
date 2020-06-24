@@ -5,6 +5,7 @@ const auth = require("./auth.json");
 
 let watashiSearch = /(?<![a-zA-Z])You(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
 let smolWatashiSearch = /(?<![a-zA-Z])you-chan(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
+let yesWatanabeSearch = /\(yes Watanabe\)/gm;
 let animeChannelID: {
   [guildID: string]: string;
 };
@@ -126,6 +127,19 @@ function nosoro(channel: Discord.TextChannel | Discord.DMChannel): void {
     .catch();
 }
 
+function yesWatanabe(channel: Discord.TextChannel | Discord.DMChannel): void {
+  if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
+  channel
+    .send({
+      files: [
+        {
+          attachment: "resources/yesWatanabe.png",
+        },
+      ],
+    })
+    .catch();
+}
+
 function canSend(channel: Discord.TextChannel): boolean {
   let ret: boolean | undefined;
   if (bot instanceof Discord.Client && bot.user)
@@ -208,7 +222,8 @@ bot.on("message", (message) => {
       animeChannelID[message.guild.id] == message.channel.id
     ) {
       if (content.search(watashiSearch) > -1) {
-        watashi(channel);
+        if (content.search(yesWatanabeSearch) > -1) yesWatanabe(channel);
+        else watashi(channel);
       } else if (content.search(smolWatashiSearch) > -1) {
         smolWatashi(channel);
       }
