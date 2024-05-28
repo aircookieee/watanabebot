@@ -4,7 +4,7 @@
 It's a ~~dumb~~ cute Discord bot I fixed and modified (I added features too!) to work with one very specific discord server. Modifying the code is probably needed if you want to host this yourself.
 Reacts with various emojis of You Watanabe from Love Live! Sunshine!! if someone accidentally summons her.
 
-# Usage
+## Usage
 
 Will automatically react to summons in all channels by default.
 
@@ -14,9 +14,7 @@ _NOTE: If you don't have the Administrator permission, these commands will not w
 
 Type `!yousoro` for the list of commands.
 
-# Installation
-
-  
+## Installation
 
 1. Install [Node.js](https://nodejs.org/en/)
 
@@ -42,6 +40,11 @@ Type `!yousoro` for the list of commands.
 
 ~~haha, 98~~
 
-# Credits
+## Known issues
+
+❌ The bot will randomly quit after some time due to a network error. This is being investigated.
+
+## Credits
+
 [README art](https://x.com/i/web/status/1150801061872930816) by wasteman800
 Thanks to stuff#6454 for the small You neso picture and feature inspiration
