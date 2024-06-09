@@ -20,7 +20,10 @@ let commandSearch = /^!yousoro(?:$| (.+))/;
 let databasePath = "database.json";
 let bot: Discord.Client;
 
-let twitterGlobalToggle: string = String(fs.readFileSync("watanabebot/build/twitter.txt"));
+let twitterDir = "./twitter.txt"; 
+if (!fs.existsSync(twitterDir))
+  fs.writeFileSync(twitterDir, "false");
+let twitterGlobalToggle: string = String(fs.readFileSync(twitterDir));
 let pluralKitUID = "466378653216014359";
 
 try {
@@ -39,13 +42,13 @@ try {
 function watashi(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1122673094750896228").catch(err => {channel.send("Nosoro :(")});
+    .react("1247638024372621442").catch(err => {channel.send("Nosoro :(")});
 }
 
 function smolWatashi(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("853643607612325888").catch(err => {channel.send("Nosoro :(")});
+    .react("1247638021482872944").catch(err => {channel.send("Nosoro :(")});
 }
 
 function yousoroInfo(channel: Discord.TextChannel): void {
@@ -125,7 +128,7 @@ function nosoro(channel: Discord.TextChannel | Discord.DMChannel): void {
 function yesWatanabe(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("911047098236010566").catch(err => {channel.send("Nosoro :(")});
+    .react("1247638018949644298").catch(err => {channel.send("Nosoro :(")});
 }
 
 function canSend(channel: Discord.TextChannel): boolean {
@@ -291,11 +294,11 @@ bot.on("message", (message) => {
       } else if (arg == "twitter on") {
           twitterGlobalToggle = "true";
           channel.send("Twitter Link Replacement is **ON**");
-          fs.writeFileSync('build/twitter.txt', String(twitterGlobalToggle));
+          fs.writeFileSync(twitterDir, String(twitterGlobalToggle));
       } else if (arg == "twitter off") {
           twitterGlobalToggle = "false";
           channel.send("Twitter Link Replacement is **OFF**");
-          fs.writeFileSync('build/twitter.txt', String(twitterGlobalToggle));
+          fs.writeFileSync(twitterDir, String(twitterGlobalToggle));
       }
     } else {
       nosoro(channel);
