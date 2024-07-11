@@ -42,13 +42,13 @@ try {
 function watashi(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1247638024372621442").catch(err => {channel.send("Nosoro :(")});
+    .react("1247638024372621442").catch(err => {console.log("Couldn't react to message " + message.id)});
 }
 
 function smolWatashi(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1247638021482872944").catch(err => {channel.send("Nosoro :(")});
+    .react("1247638021482872944").catch(err => {console.log("Couldn't react to message " + message.id)});
 }
 
 function yousoroInfo(channel: Discord.TextChannel): void {
@@ -128,7 +128,7 @@ function nosoro(channel: Discord.TextChannel | Discord.DMChannel): void {
 function yesWatanabe(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1247638018949644298").catch(err => {channel.send("Nosoro :(")});
+    .react("1247638018949644298").catch(err => {console.log("Couldn't react to message " + message.id)});
 }
 
 function canSend(channel: Discord.TextChannel): boolean {
