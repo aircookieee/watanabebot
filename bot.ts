@@ -4,6 +4,9 @@ import ts = require("typescript");
 import axios from "axios";
 import * as deepl from 'deepl-node';
 import webhookIDs from './channelsID.json';
+import SpotifyWebApi from 'spotify-web-api-node';
+import * as path from 'path';
+import cron from 'node-cron';
 
 const auth = require("../auth.json");
 
@@ -218,11 +221,121 @@ async function translateEmbedData(message: Discord.Message) {
   message.channel.send(deeplOutput);
 }
 
+// SPOTIFY RANDOM SONG PICKER
+
+const PLAYED_TRACKS_FILE = path.join(__dirname, 'played_tracks.json');
+var PLAYED_TRACKS_NUMBER: any;
+var TOTAL_TRACKS_NUMBER: any;
+
+// Set up the Spotify API client with credentials
+const spotifyApi = new SpotifyWebApi({
+  clientId: 'e396157fb2c14402aed0bfbc271863c6',
+  clientSecret: '766e7505395c4e3f986b2c3b5d483b4e',
+});
+
+// Authenticate (OAuth flow, user login or client credentials)
+async function authenticate() {
+  try {
+    const data = await spotifyApi.clientCredentialsGrant();
+    spotifyApi.setAccessToken(data.body['access_token']);
+    console.log('Access token retrieved successfully');
+  } catch (error) {
+    console.error('Failed to authenticate', error);
+  }
+}
+
+// Load and save played tracks
+function loadPlayedTracks(): Set<string> {
+  if (fs.existsSync(PLAYED_TRACKS_FILE)) {
+    const data = fs.readFileSync(PLAYED_TRACKS_FILE, 'utf8');
+    var set: Set<string> = new Set(JSON.parse(data));
+    PLAYED_TRACKS_NUMBER = set.size;
+    return set;
+  }
+  return new Set();
+}
+
+function savePlayedTracks(selectedTracks: Set<string>) {
+  fs.writeFileSync(PLAYED_TRACKS_FILE, JSON.stringify(Array.from(selectedTracks)), 'utf8');
+}
+
+// Fetch tracks from Spotify
+async function getPlaylistTracks(playlistId: string): Promise<{ title: string, link: string, uri: string, albumCover: string, artists: string}[]> {
+  let trackData: { title: string, link: string, uri: string, albumCover: string, artists: string}[] = [];
+  let offset = 0;
+  const limit = 100;
+
+  try {
+    let response;
+    do {
+      response = await spotifyApi.getPlaylistTracks(playlistId, {
+        offset,
+        limit,
+        fields: 'items.track.name,items.track.uri,items.track.external_urls.spotify,items.track.album.images,items.track.artists,total',
+      });
+
+      const tracks = response.body.items
+        .filter(item => item.track !== null)
+        .map(item => ({
+          title: item.track!.name,
+          link: item.track!.external_urls.spotify,
+          uri: item.track!.uri,
+          albumCover: item.track!.album.images[0]?.url || '', // Get the largest album cover, fallback to empty string if not available
+          artists: item.track!.artists.map(artist => artist.name).join(', '), // Extract and join the artist names
+        }));
+
+      trackData.push(...tracks);
+      offset += limit;
+    } while (trackData.length < response.body.total);
+  } catch (error) {
+    console.error('Failed to fetch tracks', error);
+  }
+  TOTAL_TRACKS_NUMBER = trackData.length;
+  return trackData;
+}
+
+// Shuffle and select tracks randomly
+class PlaylistRandomizer {
+  private tracks: { title: string, link: string, uri: string, albumCover: string, artists: string }[];
+  private selectedTracks: Set<string>;
+
+  constructor(tracks: { title: string, link: string, uri: string, albumCover: string, artists: string }[], selectedTracks: Set<string>) {
+    this.tracks = tracks;
+    this.selectedTracks = selectedTracks;
+  }
+
+  private shuffleArray(array: { title: string, link: string, uri: string, albumCover: string, artists: string}[]): { title: string, link: string, uri: string, albumCover: string, artists: string}[] {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  getNextTrack(): { title: string, link: string, albumCover: string, artists: string } | null {
+    if (this.selectedTracks.size === this.tracks.length) {
+      console.log('All tracks have been played!');
+      return null;
+    }
+
+    let shuffledTracks = this.shuffleArray([...this.tracks]);
+    for (let track of shuffledTracks) {
+      if (!this.selectedTracks.has(track.uri)) {
+        this.selectedTracks.add(track.uri);
+        savePlayedTracks(this.selectedTracks);
+        return { title: track.title, link: track.link, albumCover: track.albumCover, artists: track.artists};
+      }
+    }
+
+    return null;
+  }
+}
+
 // Initialize Discord Bot
 bot = new Discord.Client();
 
 bot.login(auth.token);
-
+var loveLiveChannel: Discord.Channel; 
 bot.on("ready", () => {
   console.log("Connected");
   console.log("Logged in as: ");
@@ -236,6 +349,14 @@ bot.on("ready", () => {
       writeDatabase();
     }
   }
+  
+
+  cron.schedule('0 2 * * *', () => {
+    console.log('Running the daily task...');
+    const channelId = '1298395516027273317';
+    bot.channels.fetch(channelId, true).then(channel => loveLiveChannel = channel);
+    timeToLoveLive();
+  });
 });
 
 bot.on("guildCreate", (guild) => {
@@ -322,3 +443,42 @@ bot.on("message", (message) => {
     }
   }
 });
+
+async function timeToLoveLive() {
+  await authenticate();
+
+  const playlistId = '6kMvn55csbTUVuuGYMzB1e'; // Replace with your playlist ID
+  const tracks = await getPlaylistTracks(playlistId);
+
+  if (tracks.length === 0) {
+    console.log('No tracks found in the playlist.');
+    return;
+  }
+
+  const playedTracks = loadPlayedTracks();
+  const playlistRandomizer = new PlaylistRandomizer(tracks, playedTracks);
+
+  const track = playlistRandomizer.getNextTrack();
+  if (track) {
+    const fullName = track.artists + " - " + track.title;
+    const trackAppleMusic = fullName.replace(/ /gm, "%20");
+    const trackYTMusic = fullName.replace(/ /gm, '+');
+    const today = new Date();
+    const finishDate = new Date();
+    finishDate.setDate(today.getDate() + (TOTAL_TRACKS_NUMBER-PLAYED_TRACKS_NUMBER));
+    if (loveLiveChannel && loveLiveChannel.isText()) {
+      const embed = new Discord.MessageEmbed()
+        .setColor('#e4007f') // RABURAIBU
+        .setTitle(`Love Live time!`)
+        .setURL(track.link)
+        .setDescription(`Today's song is:\n**${fullName}**\n\n[Listen on Spotify](${track.link})\n[Listen on Apple Music](https://music.apple.com/us/search?term=${trackAppleMusic}})\n[Listen on YouTube Music](https://music.youtube.com/search?q=${trackYTMusic})`)
+        .setImage(track.albumCover) // Set the album cover as image
+        .setFooter(`Completed: ${PLAYED_TRACKS_NUMBER} - Remaining: ${TOTAL_TRACKS_NUMBER-PLAYED_TRACKS_NUMBER} - ETA: ${finishDate.toDateString()} \nWhat the fuck did you just fucking say about μ's, you little bitch?`);
+
+      // Send the embed to the Discord channel
+      await loveLiveChannel.send(embed);
+    } else {
+      console.error(`Channel ${loveLiveChannel} not found or not text-based.`);
+    }
+  }
+}
