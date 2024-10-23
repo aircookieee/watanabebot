@@ -3,7 +3,7 @@ import fs = require("fs");
 import ts = require("typescript");
 import axios from "axios";
 import * as deepl from 'deepl-node';
-import webhookIDs from './channelsID.json';
+import channelIDs from './channelsID.json';
 import SpotifyWebApi from 'spotify-web-api-node';
 import * as path from 'path';
 import cron from 'node-cron';
@@ -229,8 +229,8 @@ var TOTAL_TRACKS_NUMBER: any;
 
 // Set up the Spotify API client with credentials
 const spotifyApi = new SpotifyWebApi({
-  clientId: 'e396157fb2c14402aed0bfbc271863c6',
-  clientSecret: '766e7505395c4e3f986b2c3b5d483b4e',
+  clientId: auth.spotifyID,
+  clientSecret: auth.spotifySecret,
 });
 
 // Authenticate (OAuth flow, user login or client credentials)
@@ -349,11 +349,10 @@ bot.on("ready", () => {
       writeDatabase();
     }
   }
-  
 
   cron.schedule('0 2 * * *', () => {
     console.log('Running the daily task...');
-    const channelId = '1298395516027273317';
+    const channelId = channelIDs.loveLiveMusicChannelID;
     bot.channels.fetch(channelId, true).then(channel => loveLiveChannel = channel);
     timeToLoveLive();
   });
@@ -388,7 +387,7 @@ bot.on("message", (message) => {
   // call deepl translation API on current message
   /* if (message.embeds[0] != null) 
     console.log(new Date() + " Embed found, expected " + webhookIDs.musicartWebhookID + ", got author ID " + message.author.id + " webhook ID " + message.webhookID); */
-  if (message.author.id == webhookIDs.musicartWebhookID && message.embeds[0].description != "") {
+  if (message.author.id == channelIDs.musicartWebhookID && message.embeds[0].description != "") {
     console.log("Called function on message " + message.id)
     translateEmbedData(message);
   }
@@ -447,8 +446,7 @@ bot.on("message", (message) => {
 async function timeToLoveLive() {
   await authenticate();
 
-  const playlistId = '6kMvn55csbTUVuuGYMzB1e'; // Replace with your playlist ID
-  const tracks = await getPlaylistTracks(playlistId);
+  const tracks = await getPlaylistTracks(channelIDs.playlistID);
 
   if (tracks.length === 0) {
     console.log('No tracks found in the playlist.');
