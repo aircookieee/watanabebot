@@ -458,6 +458,7 @@ async function timeToLoveLive() {
 
   const track = playlistRandomizer.getNextTrack();
   if (track) {
+    PLAYED_TRACKS_NUMBER += 1;  // Count today's song
     const fullName = track.artists + " - " + track.title;
     const trackAppleMusic = fullName.replace(/ /gm, "%20");
     const trackYTMusic = fullName.replace(/ /gm, '+');
