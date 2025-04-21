@@ -2,18 +2,22 @@ import Discord = require("discord.js");
 import fs = require("fs");
 import ts = require("typescript");
 import axios from "axios";
-import * as deepl from 'deepl-node';
-import channelIDs from './channelsID.json';
-import SpotifyWebApi from 'spotify-web-api-node';
-import * as path from 'path';
-import cron from 'node-cron';
+import * as deepl from "deepl-node";
+import channelIDs from "./channelsID.json";
+import SpotifyWebApi from "spotify-web-api-node";
+import * as path from "path";
+import * as AniList from "./anilist";
+import { createAnimeEmbed } from "./commands";
+import cron from "node-cron";
 
 const auth = require("../auth.json");
 
 let watashiSearch = /(?<![a-zA-Z])You(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
-let smolWatashiSearch = /(?<![a-zA-Z])you-chan(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
+let smolWatashiSearch =
+  /(?<![a-zA-Z])you-chan(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
 let yesWatanabeSearch = /\(yes [Ww]atanabe\)/gm;
-let twitterLinkNew = /(https:\/\/((x.com)|(twitter.com))\/(\w+)(\/(\w+)\/(\w+))?)/gi;
+let twitterLinkNew =
+  /(https:\/\/((x.com)|(twitter.com))\/(\w+)(\/(\w+)\/(\w+))?)/gi;
 let nitterLinkNew = /(https:\/\/nitter\.net\/(\w+)(\/(\w+)\/(\w+))?)/gi;
 let animeChannelID: {
   [guildID: string]: string;
@@ -23,9 +27,10 @@ let commandSearch = /^!yousoro(?:$| (.+))/;
 let databasePath = "database.json";
 let bot: Discord.Client;
 
-let twitterDir = "./twitter.txt"; 
-if (!fs.existsSync(twitterDir))
+let twitterDir = "./twitter.txt";
+if (!fs.existsSync(twitterDir)) {
   fs.writeFileSync(twitterDir, "false");
+}
 let twitterGlobalToggle: string = String(fs.readFileSync(twitterDir));
 let pluralKitUID = "466378653216014359";
 
@@ -42,16 +47,26 @@ try {
   }
 }
 
-function watashi(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
+function watashi(
+  channel: Discord.TextChannel | Discord.DMChannel,
+  message: Discord.Message,
+): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1247638024372621442").catch(err => {console.log("Couldn't react to message " + message.id)});
+    .react("1247638024372621442").catch((err) => {
+      console.log("Couldn't react to message " + message.id);
+    });
 }
 
-function smolWatashi(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
+function smolWatashi(
+  channel: Discord.TextChannel | Discord.DMChannel,
+  message: Discord.Message,
+): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1247638021482872944").catch(err => {console.log("Couldn't react to message " + message.id)});
+    .react("1247638021482872944").catch((err) => {
+      console.log("Couldn't react to message " + message.id);
+    });
 }
 
 function yousoroInfo(channel: Discord.TextChannel): void {
@@ -65,7 +80,7 @@ function yousoroInfo(channel: Discord.TextChannel): void {
               attachment: "resources/ohayousoro.png",
             },
           ],
-        }
+        },
       )
       .catch();
   }
@@ -128,16 +143,22 @@ function nosoro(channel: Discord.TextChannel | Discord.DMChannel): void {
     .catch();
 }
 
-function yesWatanabe(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message): void {
+function yesWatanabe(
+  channel: Discord.TextChannel | Discord.DMChannel,
+  message: Discord.Message,
+): void {
   if (channel instanceof Discord.TextChannel && !canSend(channel)) return;
   message
-    .react("1247638018949644298").catch(err => {console.log("Couldn't react to message " + message.id)});
+    .react("1247638018949644298").catch((err) => {
+      console.log("Couldn't react to message " + message.id);
+    });
 }
 
 function canSend(channel: Discord.TextChannel): boolean {
   let ret: boolean | undefined;
-  if (bot instanceof Discord.Client && bot.user)
+  if (bot instanceof Discord.Client && bot.user) {
     ret = channel.permissionsFor(bot.user)?.has("SEND_MESSAGES");
+  }
 
   return ret ? ret : false;
 }
@@ -147,25 +168,34 @@ function writeDatabase(): void {
 }
 
 // function to replace twitter links with vxtwitter (now with more X!)
-function fixTwitterEmbeds(channel: Discord.TextChannel | Discord.DMChannel, message: Discord.Message) {
-  if (message.webhookID && message.application?.id != pluralKitUID) return;  // I hate everyone but pluralkit
+function fixTwitterEmbeds(
+  channel: Discord.TextChannel | Discord.DMChannel,
+  message: Discord.Message,
+) {
+  if (message.webhookID && message.application?.id != pluralKitUID) return; // I hate everyone but pluralkit
   let vxLink = "";
   let finalMessage = "";
-  let tmsg = message.content.match(twitterLinkNew)!;  // I fuckign HATE regex
-  if (tmsg == null)
+  let tmsg = message.content.match(twitterLinkNew)!; // I fuckign HATE regex
+  if (tmsg == null) {
     tmsg = message.content.match(nitterLinkNew)!; // I fuckign HATE regex
+  }
   for (let i = 0; i < tmsg.length; i++) {
-    if (tmsg[i].includes("vxtwitter") || tmsg[i].includes("fxtwitter")) continue;
-    if (tmsg[i].includes("https://x.com/"))
+    if (tmsg[i].includes("vxtwitter") || tmsg[i].includes("fxtwitter")) {
+      continue;
+    }
+    if (tmsg[i].includes("https://x.com/")) {
       vxLink = tmsg[i].replace("x", "vxtwitter");
-    else if (tmsg[i].includes("https://twitter.com/"))
+    } else if (tmsg[i].includes("https://twitter.com/")) {
       vxLink = tmsg[i].replace("twitter", "vxtwitter");
-    else if (tmsg[i].includes("https://nitter.net/"))
+    } else if (tmsg[i].includes("https://nitter.net/")) {
       vxLink = tmsg[i].replace("nitter.net", "vxtwitter.com");
+    }
     if (finalMessage.includes(vxLink)) continue;
     finalMessage = finalMessage.concat(vxLink + "\n");
   }
-  channel.send(finalMessage).catch(err => console.log("Exception occurred! " + err));
+  channel.send(finalMessage).catch((err) =>
+    console.log("Exception occurred! " + err)
+  );
 }
 
 /* function buildAnimeThemesEmbed(animeThemesGeneralData: any, themeType: string) {
@@ -177,7 +207,7 @@ function fixTwitterEmbeds(channel: Discord.TextChannel | Discord.DMChannel, mess
     .setAuthor({name: "You-chan's Magic Cannon", iconURL: "https://files.catbox.moe/jr6tkw.jpg"})
     .setVideo = ("https://v.animethemes.moe/" + animeThemesGeneralData.anime.slug + "-" + themeType + ".webm")
   return animeThemesEmbed;
-} 
+}
 
 async function sendAnimeThemesWebhook(channel: Discord.TextChannel) {
   let webhook = await channel.createWebhook("You-chan's Magic Cannon", {avatar: "https://files.catbox.moe/jr6tkw.jpg"})
@@ -188,30 +218,44 @@ async function sendAnimeThemesWebhook(channel: Discord.TextChannel) {
 async function animeThemesVideo(animeString: string) {
   try {
     let { data } = await axios.get(
-      "https://api.animethemes.moe/video/?q=" + animeString
-    )
+      "https://api.animethemes.moe/video/?q=" + animeString,
+    );
     return data;
-  } catch(err){
+  } catch (err) {
     console.log(err);
   }
 }
 
-async function callAnimeThemes(arg: string, channel: Discord.TextChannel){
+async function callAnimeThemes(arg: string, channel: Discord.TextChannel) {
   const animeName = arg.slice(6);
-  const animeThemesVideoData = await animeThemesVideo(animeName)
+  const animeThemesVideoData = await animeThemesVideo(animeName);
   try {
-  channel.send("["+ animeThemesVideoData.videos['0'].filename + " (" + animeThemesVideoData.videos['0'].source +")]("+animeThemesVideoData.videos['0'].link+")");
-  } catch(err){channel.send("No themes found, either the animethemes search sucks or you misspelled something.")}
+    channel.send(
+      "[" + animeThemesVideoData.videos["0"].filename + " (" +
+        animeThemesVideoData.videos["0"].source + ")](" +
+        animeThemesVideoData.videos["0"].link + ")",
+    );
+  } catch (err) {
+    channel.send(
+      "No themes found, either the animethemes search sucks or you misspelled something.",
+    );
+  }
 }
 
-async function requestTranslationData(messageEmbed: Discord.MessageEmbed): Promise<string> {
+async function requestTranslationData(
+  messageEmbed: Discord.MessageEmbed,
+): Promise<string> {
   const translator = new deepl.Translator(auth.deeplAuthKey);
   console.log("Translator created successfully");
   if (messageEmbed.description == null) {
     console.log("Embed description empty!");
     return "";
   }
-  let tlTextResult = await translator.translateText(messageEmbed.description, 'ja', 'en-US'); // let's hope this never times out
+  let tlTextResult = await translator.translateText(
+    messageEmbed.description,
+    "ja",
+    "en-US",
+  ); // let's hope this never times out
   return tlTextResult.text;
 }
 
@@ -223,7 +267,7 @@ async function translateEmbedData(message: Discord.Message) {
 
 // SPOTIFY RANDOM SONG PICKER
 
-const PLAYED_TRACKS_FILE = path.join(__dirname, 'played_tracks.json');
+const PLAYED_TRACKS_FILE = path.join(__dirname, "played_tracks.json");
 var PLAYED_TRACKS_NUMBER: any;
 var TOTAL_TRACKS_NUMBER: any;
 
@@ -237,17 +281,17 @@ const spotifyApi = new SpotifyWebApi({
 async function authenticate() {
   try {
     const data = await spotifyApi.clientCredentialsGrant();
-    spotifyApi.setAccessToken(data.body['access_token']);
-    console.log('Access token retrieved successfully');
+    spotifyApi.setAccessToken(data.body["access_token"]);
+    console.log("Access token retrieved successfully");
   } catch (error) {
-    console.error('Failed to authenticate', error);
+    console.error("Failed to authenticate", error);
   }
 }
 
 // Load and save played tracks
 function loadPlayedTracks(): Set<string> {
   if (fs.existsSync(PLAYED_TRACKS_FILE)) {
-    const data = fs.readFileSync(PLAYED_TRACKS_FILE, 'utf8');
+    const data = fs.readFileSync(PLAYED_TRACKS_FILE, "utf8");
     var set: Set<string> = new Set(JSON.parse(data));
     PLAYED_TRACKS_NUMBER = set.size;
     return set;
@@ -256,12 +300,32 @@ function loadPlayedTracks(): Set<string> {
 }
 
 function savePlayedTracks(selectedTracks: Set<string>) {
-  fs.writeFileSync(PLAYED_TRACKS_FILE, JSON.stringify(Array.from(selectedTracks)), 'utf8');
+  fs.writeFileSync(
+    PLAYED_TRACKS_FILE,
+    JSON.stringify(Array.from(selectedTracks)),
+    "utf8",
+  );
 }
 
 // Fetch tracks from Spotify
-async function getPlaylistTracks(playlistId: string): Promise<{ title: string, link: string, uri: string, albumCover: string, artists: string}[]> {
-  let trackData: { title: string, link: string, uri: string, albumCover: string, artists: string}[] = [];
+async function getPlaylistTracks(
+  playlistId: string,
+): Promise<
+  {
+    title: string;
+    link: string;
+    uri: string;
+    albumCover: string;
+    artists: string;
+  }[]
+> {
+  let trackData: {
+    title: string;
+    link: string;
+    uri: string;
+    albumCover: string;
+    artists: string;
+  }[] = [];
   let offset = 0;
   const limit = 100;
 
@@ -271,24 +335,25 @@ async function getPlaylistTracks(playlistId: string): Promise<{ title: string, l
       response = await spotifyApi.getPlaylistTracks(playlistId, {
         offset,
         limit,
-        fields: 'items.track.name,items.track.uri,items.track.external_urls.spotify,items.track.album.images,items.track.artists,total',
+        fields:
+          "items.track.name,items.track.uri,items.track.external_urls.spotify,items.track.album.images,items.track.artists,total",
       });
 
       const tracks = response.body.items
-        .filter(item => item.track !== null)
-        .map(item => ({
+        .filter((item) => item.track !== null)
+        .map((item) => ({
           title: item.track!.name,
           link: item.track!.external_urls.spotify,
           uri: item.track!.uri,
-          albumCover: item.track!.album.images[0]?.url || '', // Get the largest album cover, fallback to empty string if not available
-          artists: item.track!.artists.map(artist => artist.name).join(', '), // Extract and join the artist names
+          albumCover: item.track!.album.images[0]?.url || "", // Get the largest album cover, fallback to empty string if not available
+          artists: item.track!.artists.map((artist) => artist.name).join(", "), // Extract and join the artist names
         }));
 
       trackData.push(...tracks);
       offset += limit;
     } while (trackData.length < response.body.total);
   } catch (error) {
-    console.error('Failed to fetch tracks', error);
+    console.error("Failed to fetch tracks", error);
   }
   TOTAL_TRACKS_NUMBER = trackData.length;
   return trackData;
@@ -296,15 +361,44 @@ async function getPlaylistTracks(playlistId: string): Promise<{ title: string, l
 
 // Shuffle and select tracks randomly
 class PlaylistRandomizer {
-  private tracks: { title: string, link: string, uri: string, albumCover: string, artists: string }[];
+  private tracks: {
+    title: string;
+    link: string;
+    uri: string;
+    albumCover: string;
+    artists: string;
+  }[];
   private selectedTracks: Set<string>;
 
-  constructor(tracks: { title: string, link: string, uri: string, albumCover: string, artists: string }[], selectedTracks: Set<string>) {
+  constructor(
+    tracks: {
+      title: string;
+      link: string;
+      uri: string;
+      albumCover: string;
+      artists: string;
+    }[],
+    selectedTracks: Set<string>,
+  ) {
     this.tracks = tracks;
     this.selectedTracks = selectedTracks;
   }
 
-  private shuffleArray(array: { title: string, link: string, uri: string, albumCover: string, artists: string}[]): { title: string, link: string, uri: string, albumCover: string, artists: string}[] {
+  private shuffleArray(
+    array: {
+      title: string;
+      link: string;
+      uri: string;
+      albumCover: string;
+      artists: string;
+    }[],
+  ): {
+    title: string;
+    link: string;
+    uri: string;
+    albumCover: string;
+    artists: string;
+  }[] {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
@@ -312,9 +406,14 @@ class PlaylistRandomizer {
     return array;
   }
 
-  getNextTrack(): { title: string, link: string, albumCover: string, artists: string } | null {
+  getNextTrack(): {
+    title: string;
+    link: string;
+    albumCover: string;
+    artists: string;
+  } | null {
     if (this.selectedTracks.size === this.tracks.length) {
-      console.log('All tracks have been played!');
+      console.log("All tracks have been played!");
       return null;
     }
 
@@ -323,7 +422,12 @@ class PlaylistRandomizer {
       if (!this.selectedTracks.has(track.uri)) {
         this.selectedTracks.add(track.uri);
         savePlayedTracks(this.selectedTracks);
-        return { title: track.title, link: track.link, albumCover: track.albumCover, artists: track.artists};
+        return {
+          title: track.title,
+          link: track.link,
+          albumCover: track.albumCover,
+          artists: track.artists,
+        };
       }
     }
 
@@ -335,7 +439,7 @@ class PlaylistRandomizer {
 bot = new Discord.Client();
 
 bot.login(auth.token);
-var loveLiveChannel: Discord.Channel; 
+var loveLiveChannel: Discord.Channel;
 bot.on("ready", () => {
   console.log("Connected");
   console.log("Logged in as: ");
@@ -350,11 +454,27 @@ bot.on("ready", () => {
     }
   }
 
-  cron.schedule('0 2 * * *', () => {
-    console.log('Running the daily task...');
+  cron.schedule("0 2,14 * * *", () => {
+    console.log("Love Live time!");
     const channelId = channelIDs.loveLiveMusicChannelID;
-    bot.channels.fetch(channelId, true).then(channel => loveLiveChannel = channel);
+    bot.channels.fetch(channelId, true).then((channel) =>
+      loveLiveChannel = channel
+    );
     timeToLoveLive();
+  });
+  cron.schedule("0 * * * *", async () => {
+    console.log(`[${new Date().toISOString()}] Auto-updating AniList data...`);
+    try {
+      await AniList.updateAniListData();
+      console.log(
+        `[${new Date().toISOString()}] AniList data updated successfully.`,
+      );
+    } catch (e) {
+      console.error(
+        `[${new Date().toISOString()}] Failed to update AniList data:`,
+        e,
+      );
+    }
   });
 });
 
@@ -368,33 +488,43 @@ bot.on("guildDelete", (guild) => {
   writeDatabase();
 });
 
-bot.on("message", (message) => {
+bot.on("message", async (message) => {
   let content = message.content;
   let command = content.match(commandSearch);
   let channel: Discord.TextChannel | Discord.DMChannel | undefined;
 
   // Check if user is bot and not a webhook, skip if both conditions are met
-  if (message.author.bot && !message.webhookID) 
+  if (message.author.bot && !message.webhookID) {
     return;
+  }
 
   if (
     message.channel instanceof Discord.TextChannel ||
     message.channel instanceof Discord.DMChannel
-  )
+  ) {
     channel = message.channel;
-  else return;
+  } else return;
 
   // call deepl translation API on current message
-  /* if (message.embeds[0] != null) 
+  /* if (message.embeds[0] != null)
     console.log(new Date() + " Embed found, expected " + webhookIDs.musicartWebhookID + ", got author ID " + message.author.id + " webhook ID " + message.webhookID); */
-  if (message.author.id == channelIDs.musicartWebhookID && message.embeds[0].description != "") {
-    console.log("Called function on message " + message.id)
+  if (
+    message.author.id == channelIDs.musicartWebhookID &&
+    message.embeds[0].description != ""
+  ) {
+    console.log("Called function on message " + message.id);
     translateEmbedData(message);
   }
 
-  if (twitterGlobalToggle == "true")
-    if (content.includes("https://x.com/") || content.includes("https://twitter.com/") || content.includes("https://nitter.net/")) 
+  if (twitterGlobalToggle == "true") {
+    if (
+      content.includes("https://x.com/") ||
+      content.includes("https://twitter.com/") ||
+      content.includes("https://nitter.net/")
+    ) {
       fixTwitterEmbeds(channel, message);
+    }
+  }
   if (command) {
     if (channel instanceof Discord.DMChannel) {
       yousoroDMs(channel);
@@ -412,16 +542,50 @@ bot.on("message", (message) => {
       } else if (arg == "everywhere") {
         yousoroEverywhere(channel);
       } else if (arg == "twitter on") {
-          twitterGlobalToggle = "true";
-          channel.send("Twitter Link Replacement is **ON**");
-          fs.writeFileSync(twitterDir, String(twitterGlobalToggle));
+        twitterGlobalToggle = "true";
+        channel.send("Twitter Link Replacement is **ON**");
+        fs.writeFileSync(twitterDir, String(twitterGlobalToggle));
       } else if (arg == "twitter off") {
-          twitterGlobalToggle = "false";
-          channel.send("Twitter Link Replacement is **OFF**");
-          fs.writeFileSync(twitterDir, String(twitterGlobalToggle));
+        twitterGlobalToggle = "false";
+        channel.send("Twitter Link Replacement is **OFF**");
+        fs.writeFileSync(twitterDir, String(twitterGlobalToggle));
       }
     } else {
       nosoro(channel);
+    }
+  } else if (content.startsWith("!al")) {
+    const args = content.trim().split(" ").slice(1);
+    const sub = args[0]?.toLowerCase();
+    const rest = args.slice(1).join(" ");
+    const fullQuery = [sub, rest].filter(Boolean).join(" ");
+
+    // Register: !al register <username>
+    if (sub === "register" && args[1]) {
+      await AniList.registerUser(message.author.id, args[1]);
+      channel.send(`Registered \`${args[1]}\` to <@${message.author.id}>.`);
+    } // Update: !al update
+    else if (sub === "update") {
+      channel.send(`Updating AniList data...`).then(async msg => {
+        await AniList.updateAniListData();
+        msg.edit("AniList data updated.");
+      });
+    } // Default: !al <anime name>
+    else if (fullQuery.length > 0) {
+      const animeInfo = await AniList.getAnimeInfoWithScores(fullQuery);
+      const embed = createAnimeEmbed(
+        animeInfo.resolvedTitle,
+        animeInfo.anilistURL,
+        animeInfo.description,
+        animeInfo.score,
+        animeInfo.coverImage,
+        animeInfo.matches,
+      );
+      channel.send(embed);
+    }
+    else {
+      channel.send(
+        "Usage:\n• `!al <anime name>`\n• `!al register <AniList username>`\n• `!al update`",
+      );
     }
   } else if (message.author.id != bot.user?.id) {
     if (
@@ -430,8 +594,9 @@ bot.on("message", (message) => {
       animeChannelID[message.guild.id] == message.channel.id
     ) {
       if (content.search(watashiSearch) > -1) {
-        if (content.search(yesWatanabeSearch) > -1) yesWatanabe(channel, message);
-        else watashi(channel, message);
+        if (content.search(yesWatanabeSearch) > -1) {
+          yesWatanabe(channel, message);
+        } else watashi(channel, message);
       } else if (content.search(smolWatashiSearch) > -1) {
         smolWatashi(channel, message);
       }
@@ -449,7 +614,7 @@ async function timeToLoveLive() {
   const tracks = await getPlaylistTracks(channelIDs.playlistID);
 
   if (tracks.length === 0) {
-    console.log('No tracks found in the playlist.');
+    console.log("No tracks found in the playlist.");
     return;
   }
 
@@ -458,23 +623,29 @@ async function timeToLoveLive() {
 
   const track = playlistRandomizer.getNextTrack();
   if (track) {
-    PLAYED_TRACKS_NUMBER += 1;  // Count today's song
+    PLAYED_TRACKS_NUMBER += 1; // Count today's song
     const fullName = track.artists + " - " + track.title;
     const trackAppleMusic = fullName.replace(/ /gm, "%20");
-    const trackYTMusic = fullName.replace(/ /gm, '+');
+    const trackYTMusic = fullName.replace(/ /gm, "+");
     const today = new Date();
     const finishDate = new Date();
-    finishDate.setDate(today.getDate() + (TOTAL_TRACKS_NUMBER-PLAYED_TRACKS_NUMBER));
+    finishDate.setDate(
+      today.getDate() + (TOTAL_TRACKS_NUMBER - PLAYED_TRACKS_NUMBER),
+    );
     if (loveLiveChannel && loveLiveChannel.isText()) {
       const embed = new Discord.MessageEmbed()
-        .setColor('#e4007f') // RABURAIBU
+        .setColor("#e4007f") // RABURAIBU
         .setTitle(`Love Live time!`)
         .setURL(track.link)
-        .setDescription(`Today's song is:\n**${fullName}**\n\n[Listen on Spotify](${track.link})\n[Listen on Apple Music](https://music.apple.com/us/search?term=${trackAppleMusic}})\n[Listen on YouTube Music](https://music.youtube.com/search?q=${trackYTMusic})`)
+        .setDescription(
+          `Today's song is:\n**${fullName}**\n\n[Listen on Spotify](${track.link})\n[Listen on Apple Music](https://music.apple.com/us/search?term=${trackAppleMusic}})\n[Listen on YouTube Music](https://music.youtube.com/search?q=${trackYTMusic})`,
+        )
         .setImage(track.albumCover) // Set the album cover as image
-        .setFooter(`Completed: ${PLAYED_TRACKS_NUMBER} - Remaining: ${TOTAL_TRACKS_NUMBER-PLAYED_TRACKS_NUMBER} - ETA: ${finishDate.toDateString()} \nWhat the fuck did you just fucking say about μ's, you little bitch?`);
-
-      // Send the embed to the Discord channel
+        .setFooter(
+          `Completed: ${PLAYED_TRACKS_NUMBER} - Remaining: ${
+            TOTAL_TRACKS_NUMBER - PLAYED_TRACKS_NUMBER
+          } - ETA: ${finishDate.toDateString()} \nWhat the fuck did you just fucking say about μ's, you little bitch?`,
+        );
       await loveLiveChannel.send(embed);
     } else {
       console.error(`Channel ${loveLiveChannel} not found or not text-based.`);
