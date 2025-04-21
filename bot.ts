@@ -571,6 +571,7 @@ bot.on("message", async (message) => {
       });
     } // Default: !al <anime name>
     else if (fullQuery.length > 0) {
+      await AniList.updateUserAniList(message.author.id);
       const animeInfo = await AniList.getAnimeInfoWithScores(fullQuery);
       const embed = createAnimeEmbed(
         animeInfo.resolvedTitle,

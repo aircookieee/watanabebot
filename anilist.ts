@@ -153,7 +153,32 @@ export async function updateAniListData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-export async function getAnimeInfoWithScores(searchTitle: string): Promise<{
+export async function updateUserAniList(discordId: string): Promise<void> {
+  if (!fs.existsSync(MAP_FILE)) return;
+  const map: Record<string, string> = JSON.parse(
+    fs.readFileSync(MAP_FILE, "utf-8"),
+  );
+  const aniListUsername = map[discordId];
+  if (!aniListUsername) return;
+
+  try {
+    const lists = await fetchAniListLists(aniListUsername);
+    const data: Record<string, any> = fs.existsSync(DATA_FILE)
+      ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"))
+      : {};
+    data[discordId] = {
+      aniUsername: aniListUsername,
+      lastUpdated: new Date().toISOString(),
+      lists,
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    console.log(`Updated data for ${aniListUsername} on call`);
+  } catch (e) {
+    console.error(`Failed to update for ${aniListUsername} on call:`, e);
+  }
+}
+
+export async function getAnimeInfoWithScores(searchInput: string): Promise<{
   resolvedTitle: string;
   description: string;
   anilistURL: string;
@@ -163,7 +188,7 @@ export async function getAnimeInfoWithScores(searchTitle: string): Promise<{
 }> {
   if (!fs.existsSync(DATA_FILE)) {
     return {
-      resolvedTitle: searchTitle,
+      resolvedTitle: searchInput,
       description: "No description available.",
       anilistURL: "https://anilist.co",
       score: 0,
@@ -172,52 +197,88 @@ export async function getAnimeInfoWithScores(searchTitle: string): Promise<{
     };
   }
 
-  // Fetch AL media data
-  const mediaQuery = `
-    query ($search: String) {
-      Media(search: $search, type: ANIME) {
-        id
-        siteUrl
-        title { romaji english native }
-        description(asHtml: false)
-        meanScore
-        coverImage { large extraLarge }
+  const isId = /^\d+$/.test(searchInput);
+  let media: any = null;
+
+  if (isId) {
+    const idQuery = `
+      query ($id: Int) {
+        Media(id: $id, type: ANIME) {
+          id
+          siteUrl
+          title { romaji english native }
+          description(asHtml: false)
+          meanScore
+          coverImage { large extraLarge }
+        }
       }
-    }
-  `;
+    `;
 
-  const response = await fetch(ANILIST_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      query: mediaQuery,
-      variables: { search: searchTitle },
-    }),
-  });
+    const variables = { id: parseInt(searchInput, 10) };
+    const response = await fetch(ANILIST_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query: idQuery, variables }),
+    });
 
-  const json = await response.json();
-  const media = json.data?.Media;
+    const json = await response.json();
+    media = json.data?.Media;
+  } else {
+    const searchQuery = `
+      query ($search: String) {
+        Media(search: $search, type: ANIME) {
+          id
+          siteUrl
+          title { romaji english native }
+          description(asHtml: false)
+          meanScore
+          coverImage { large extraLarge }
+        }
+      }
+    `;
 
-  const resolvedTitle = media?.title?.romaji || media?.title?.english ||
-    media?.title?.native || searchTitle;
-  const matchingTitles = [
-    media?.title?.romaji?.toLowerCase(),
-    media?.title?.english?.toLowerCase(),
-    media?.title?.native?.toLowerCase(),
-  ].filter(Boolean);
+    const variables = { search: searchInput };
+    const response = await fetch(ANILIST_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query: searchQuery, variables }),
+    });
 
-  const description = media?.description
-  ?.replace(/(<br>|\n)+/g, "\n")
-  ?.replace(/<b>(.*?)<\/b>/gi, '**$1**')
-  ?.replace(/<i>(.*?)<\/i>/gi, '*$1*')
-  ?.replace(/<\/?b>/gi, '')
-  ?.replace(/<\/?i>/gi, '') || "No description available.";
-  const coverImage = media?.coverImage?.extraLarge ||
-    media?.coverImage?.large || "";
-  const anilistURL = media?.siteUrl || "https://anilist.co";
-  const score = media?.meanScore;
+    const json = await response.json();
+    media = json.data?.Media;
+  }
 
-  // User matches
+  if (!media) {
+    return {
+      resolvedTitle: searchInput,
+      description: "No matching anime found.",
+      anilistURL: "https://anilist.co",
+      score: 0,
+      coverImage: "",
+      matches: [],
+    };
+  }
+
+  const resolvedTitle = media.title.romaji || media.title.english ||
+    media.title.native || searchInput;
+  const description = media.description
+    ?.replace(/(<br>|\n)+/g, "\n")
+    ?.replace(/<b>(.*?)<\/b>/gi, "**$1**")
+    ?.replace(/<i>(.*?)<\/i>/gi, "*$1*")
+    ?.replace(/<\/?b>/gi, "")
+    ?.replace(/<\/?i>/gi, "") || "No description available.";
+
+  const coverImage = media.coverImage.extraLarge || media.coverImage.large ||
+    "";
+  const anilistURL = media.siteUrl || "https://anilist.co";
+  const score = media.meanScore || 0;
+
   const data: Record<string, any> = JSON.parse(
     fs.readFileSync(DATA_FILE, "utf-8"),
   );
@@ -227,13 +288,7 @@ export async function getAnimeInfoWithScores(searchTitle: string): Promise<{
     const { aniUsername, lists } = userData;
     for (const list of lists) {
       for (const entry of list.entries) {
-        const titles = [
-          entry.media.title.romaji?.toLowerCase(),
-          entry.media.title.english?.toLowerCase(),
-          entry.media.title.native?.toLowerCase(),
-        ].filter(Boolean);
-
-        if (titles.some((t) => matchingTitles.includes(t))) {
+        if (entry.media.id === media.id) {
           matches.push({
             discordId,
             aniUsername,
