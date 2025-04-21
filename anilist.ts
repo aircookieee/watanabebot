@@ -90,7 +90,6 @@ async function fetchAniListLists(username: string) {
                 english
                 native
               }
-              description
               status
             }
             status
