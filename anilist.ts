@@ -5,6 +5,7 @@ import fetch from "node-fetch";
 const ANILIST_API = "https://graphql.anilist.co";
 const MAP_FILE = path.join(__dirname, "discordAniListMap.json");
 const DATA_FILE = path.join(__dirname, "anilist_data.json");
+const FAVS_FILE = path.join(__dirname, "anilist_favorites.json");
 
 export type UserListEntry = {
   media: {
@@ -125,6 +126,60 @@ async function fetchAniListLists(username: string) {
   return json.data.MediaListCollection.lists;
 }
 
+async function fetchUserFavorites(username: string) {
+  const query = `
+    query ($username: String) {
+      User(name: $username) {
+        favourites {
+          anime {
+            nodes {
+              id
+              title {
+                romaji
+                english
+                native
+              }
+            }
+          }
+        }
+      }
+    }`;
+  const response = await fetch(ANILIST_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ query, variables: { username } }),
+  });
+
+  type AniListResponse = {
+    data: {
+      User: {
+        favourites: {
+          anime: {
+            nodes: {
+              id: number;
+              title: {
+                romaji: string;
+                english: string;
+                native: string;
+              };
+            }[];
+          };
+        };
+      };
+    };
+  };
+
+  const json = (await response.json()) as AniListResponse;
+  const favorites = json.data.User.favourites.anime.nodes.map((node) => ({
+    id: node.id,
+    title: node.title,
+  }));
+  return favorites;
+}
+
 export async function updateAniListData() {
   if (!fs.existsSync(MAP_FILE)) return;
   const map: Record<string, string> = JSON.parse(
@@ -150,6 +205,31 @@ export async function updateAniListData() {
   }
 
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+export async function updateFavoritesData() {
+  if (!fs.existsSync(MAP_FILE)) return;
+  const map: Record<string, string> = JSON.parse(
+    fs.readFileSync(MAP_FILE, "utf-8"),
+  );
+  const data: Record<string, any> = fs.existsSync(FAVS_FILE)
+    ? JSON.parse(fs.readFileSync(FAVS_FILE, "utf-8"))
+    : {};
+
+  for (const [discordId, username] of Object.entries(map)) {
+    try {
+      const favs = await fetchUserFavorites(username);
+      data[discordId] = {
+        aniUsername: username,
+        lastUpdated: new Date().toISOString(),
+        favs,
+      };
+      console.log(`Fetched favorites data for ${username}`);
+    } catch (e) {
+      console.error(`Failed to fetch favorites for ${username}:`, e);
+    }
+  }
+  fs.writeFileSync(FAVS_FILE, JSON.stringify(data, null, 2));
 }
 
 export async function updateUserAniList(discordId: string): Promise<void> {

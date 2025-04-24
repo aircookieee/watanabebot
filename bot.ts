@@ -574,6 +574,7 @@ bot.on("message", async (message) => {
     else if (sub === "update") {
       channel.send(`Updating AniList data...`).then(async msg => {
         await AniList.updateAniListData();
+        await AniList.updateFavoritesData();
         msg.edit("AniList data updated.");
       });
     } // Default: !al <anime name>
