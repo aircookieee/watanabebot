@@ -35,11 +35,11 @@ export function createAnimeEmbed(
     matches.forEach(user => {
         user.score != 0 ? mugAvg += user.score : zeroScores++;
     });
-    mugAvg /= matches.length-zeroScores;
+    mugAvg /= matches.length - zeroScores;
 
     embed.addFields(
-		{ name: 'Anilist Score', value: score, inline: true},
-        { name: 'MugScore™', value: Math.round(mugAvg), inline: true}
+        { name: 'Anilist Score', value: score, inline: true },
+        { name: 'MugScore™', value: Math.round(mugAvg), inline: true }
     )
 
     let userScores = "";
@@ -95,12 +95,10 @@ export function createAnimeEmbed(
                 case "DROPPED":
                     return ` ${match.aniUsername} ${match.score > 0 ? `[${match.progress}] **${match.score}**` : `[${match.progress}]`}`;
                 case "COMPLETED":
-                    return `${match.aniUsername} ${
-                        match.score > 0 ? `**${match.score}**` : "**?**"
-                    }`;
+                    return `${match.aniUsername} ${match.score > 0 ? `**${match.score}**` : ""}`;
                 case "PLANNING":
                 case "NOT_ON_LIST":
-                    return `${match.aniUsername}`;
+                    return `${match.aniUsername} ${match.score > 0 ? `**${match.score}**` : ""}`;
                 default:
                     return `${match.aniUsername}`;
             }
@@ -110,7 +108,7 @@ export function createAnimeEmbed(
             const label = status === "NOT_ON_LIST"
                 ? "Not On List"
                 : status.charAt(0).toUpperCase() +
-                    status.slice(1).toLowerCase();
+                status.slice(1).toLowerCase();
 
             userScores += `**${label}**: ${users.join(" | ")}\n`;
         }
