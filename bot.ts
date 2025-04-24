@@ -563,6 +563,13 @@ bot.on("message", async (message) => {
     if (sub === "register" && args[1]) {
       await AniList.registerUser(message.author.id, args[1]);
       channel.send(`Registered \`${args[1]}\` to <@${message.author.id}>.`);
+    }
+    else if (sub === "unregister") {
+      if (await AniList.unregisterUser(message.author.id)) {
+        channel.send(`Unregistered <@${message.author.id}>.`);
+      } else {
+        channel.send(`Could not unregister <@${message.author.id}>.`);
+      }
     } // Update: !al update
     else if (sub === "update") {
       channel.send(`Updating AniList data...`).then(async msg => {
@@ -585,7 +592,7 @@ bot.on("message", async (message) => {
     }
     else {
       channel.send(
-        "Usage:\n• `!al <anime name>`\n• `!al register <AniList username>`\n• `!al update`",
+        "Usage:\n• `!al <anime name>`\n• `!al register <AniList username>`\n• `!al unregister`\n• `!al update`",
       );
     }
   } else if (message.author.id != bot.user?.id) {

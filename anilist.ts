@@ -281,10 +281,14 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
   const data: Record<string, any> = JSON.parse(
     fs.readFileSync(DATA_FILE, "utf-8"),
   );
+  const mapFile: Record<string, any> = JSON.parse(
+    fs.readFileSync(MAP_FILE, "utf-8"),
+  );
   const matches: AnimeMatch[] = [];
 
   for (const [discordId, userData] of Object.entries(data)) {
     const { aniUsername, lists } = userData;
+    if (!Object.values(mapFile).includes(aniUsername)) continue;
     for (const list of lists) {
       for (const entry of list.entries) {
         if (entry.media.id === media.id) {
