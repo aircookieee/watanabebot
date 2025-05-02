@@ -466,6 +466,7 @@ bot.on("ready", () => {
     console.log(`[${new Date().toISOString()}] Auto-updating AniList data...`);
     try {
       await AniList.updateAniListData();
+      await AniList.updateFavoritesData();
       console.log(
         `[${new Date().toISOString()}] AniList data updated successfully.`,
       );

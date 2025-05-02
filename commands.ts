@@ -11,10 +11,11 @@ export type AnimeMatch = {
     progress: number;
     status: string;
     repeat: number;
+    isFavorite: boolean;
 };
 
 export function createAnimeEmbed(
-title: string, anilistURL: string, description: string, score: number, coverImage: string, matches: AnimeMatch[], sTime: number,
+    title: string, anilistURL: string, description: string, score: number, coverImage: string, matches: AnimeMatch[], sTime: number,
 ) {
     const embed = new MessageEmbed()
         .setTitle(title)
@@ -44,8 +45,8 @@ title: string, anilistURL: string, description: string, score: number, coverImag
     // Grouping matches by status
     const statusMap: Record<string, AnimeMatch[]> = {};
     for (const match of matches) {
-        if (match.status === "REPEATING" && match.repeat === undefined) {match.repeat = 1;}   // fix AL bs
-        if (match.status === "REPEATING") {match.status = "CURRENT";}   // force grouping in current
+        if (match.status === "REPEATING" && match.repeat === undefined) { match.repeat = 1; }   // fix AL bs
+        if (match.status === "REPEATING") { match.status = "CURRENT"; }   // force grouping in current
         if (!statusMap[match.status]) statusMap[match.status] = [];
         statusMap[match.status].push(match);
     }
@@ -80,6 +81,7 @@ title: string, anilistURL: string, description: string, score: number, coverImag
                 progress: 0,
                 repeat: 0,
                 status: "NOT_ON_LIST",
+                isFavorite: false,
             });
         }
     }
@@ -104,6 +106,9 @@ title: string, anilistURL: string, description: string, score: number, coverImag
                     if (match.repeat > 0) {
                         str += ` (R${match.repeat})`;
                     }
+                    if (match.isFavorite) {
+                        str += ` :heart:`;
+                    }
                     return str;
                 case "COMPLETED":
                     //return `${match.aniUsername} ${match.score > 0 ? `**${match.score}**` : ""}`;
@@ -113,6 +118,9 @@ title: string, anilistURL: string, description: string, score: number, coverImag
                     }
                     if (match.repeat > 0) {
                         strC += ` (R${match.repeat})`;
+                    }
+                    if (match.isFavorite) {
+                        strC += ` :heart:`;
                     }
                     return strC;
                 case "PLANNING":
@@ -124,9 +132,9 @@ title: string, anilistURL: string, description: string, score: number, coverImag
         });
 
         if (users.length > 0) {
-            let label = (status === "NOT_ON_LIST") 
-            ? "Not On List"
-            : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+            let label = (status === "NOT_ON_LIST")
+                ? "Not On List"
+                : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
             userScores += `**${label}**: ${users.join(" | ")}\n`;
         }
     }

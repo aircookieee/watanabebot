@@ -32,6 +32,7 @@ export type AnimeMatch = {
   progress: number;
   status: string;
   repeat: number;
+  isFavorite: boolean;
 };
 
 export async function registerUser(
@@ -283,6 +284,9 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
       matches: [],
     };
   }
+  const favData: Record<string, any> = fs.existsSync(FAVS_FILE)
+    ? JSON.parse(fs.readFileSync(FAVS_FILE, "utf-8"))
+    : {};
 
   const isId = /^\d+$/.test(searchInput);
   let media: any = null;
@@ -387,6 +391,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
             progress: entry.progress,
             status: entry.status,
             repeat: entry.repeat,
+            isFavorite: favData[discordId]?.favs?.some((fav: any) => fav.id === media.id) || false,
           });
         }
       }
