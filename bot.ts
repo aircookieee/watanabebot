@@ -573,12 +573,15 @@ bot.on("message", async (message) => {
     } // Update: !al update
     else if (sub === "update") {
       channel.send(`Updating AniList data...`).then(async msg => {
+        const sTime = performance.now();
         await AniList.updateAniListData();
         await AniList.updateFavoritesData();
-        msg.edit("AniList data updated.");
+        const eTime = performance.now();
+        msg.edit(`AniList data updated, took ${Math.round(eTime - sTime)/1000}s.`);
       });
     } // Default: !al <anime name>
     else if (fullQuery.length > 0) {
+      const sTime = performance.now();
       await AniList.updateUserAniList(message.author.id);
       const animeInfo = await AniList.getAnimeInfoWithScores(fullQuery);
       const embed = createAnimeEmbed(
@@ -588,6 +591,7 @@ bot.on("message", async (message) => {
         animeInfo.score,
         animeInfo.coverImage,
         animeInfo.matches,
+        sTime,
       );
       channel.send(embed);
     }

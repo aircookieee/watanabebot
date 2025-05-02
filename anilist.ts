@@ -194,17 +194,19 @@ export async function updateAniListData() {
 
   for (const [discordId, username] of Object.entries(map)) {
     try {
+      const sTime = performance.now();
       const lists = await fetchAniListLists(username);
+      const eTime = performance.now();
       data[discordId] = {
         aniUsername: username,
         lastUpdated: new Date().toISOString(),
         lists,
       };
-      console.log(`Fetched AniList data for ${username}`);
+      console.log(`Fetched AniList data for ${username}, took ${eTime - sTime}ms`);
     } catch (e) {
       console.error(`Failed to fetch for ${username}:`, e);
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // wait 1 second before the next user
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // ms delay
   }
 
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
@@ -221,16 +223,19 @@ export async function updateFavoritesData() {
 
   for (const [discordId, username] of Object.entries(map)) {
     try {
+      const sTime = performance.now();
       const favs = await fetchUserFavorites(username);
+      const eTime = performance.now();
       data[discordId] = {
         aniUsername: username,
         lastUpdated: new Date().toISOString(),
         favs,
       };
-      console.log(`Fetched favorites data for ${username}`);
+      console.log(`Fetched favorites data for ${username}, took ${eTime - sTime}ms`);
     } catch (e) {
       console.error(`Failed to fetch favorites for ${username}:`, e);
     }
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // ms delay
   }
   fs.writeFileSync(FAVS_FILE, JSON.stringify(data, null, 2));
 }

@@ -14,12 +14,7 @@ export type AnimeMatch = {
 };
 
 export function createAnimeEmbed(
-    title: string,
-    anilistURL: string,
-    description: string,
-    score: number,
-    coverImage: string,
-    matches: AnimeMatch[],
+title: string, anilistURL: string, description: string, score: number, coverImage: string, matches: AnimeMatch[], sTime: number,
 ) {
     const embed = new MessageEmbed()
         .setTitle(title)
@@ -137,6 +132,8 @@ export function createAnimeEmbed(
     }
 
     embed.addField("User Scores", userScores, false);
+    const eTime = performance.now();
+    embed.setFooter(`Execution took ${Math.round(eTime - sTime)}ms`);
 
     return embed;
 }
