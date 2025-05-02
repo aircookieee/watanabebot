@@ -1,6 +1,7 @@
 import { MessageEmbed } from "discord.js";
 import fs from "fs";
 import path from "path";
+import { NumericLiteral } from "typescript";
 
 export type AnimeMatch = {
     discordId: string;
@@ -9,6 +10,7 @@ export type AnimeMatch = {
     score: number;
     progress: number;
     status: string;
+    repeat: number;
 };
 
 export function createAnimeEmbed(
@@ -47,6 +49,8 @@ export function createAnimeEmbed(
     // Grouping matches by status
     const statusMap: Record<string, AnimeMatch[]> = {};
     for (const match of matches) {
+        if (match.status === "REPEATING" && match.repeat === undefined) {match.repeat = 1;}   // fix AL bs
+        if (match.status === "REPEATING") {match.status = "CURRENT";}   // force grouping in current
         if (!statusMap[match.status]) statusMap[match.status] = [];
         statusMap[match.status].push(match);
     }
@@ -79,6 +83,7 @@ export function createAnimeEmbed(
                 listName: "",
                 score: 0,
                 progress: 0,
+                repeat: 0,
                 status: "NOT_ON_LIST",
             });
         }
@@ -93,9 +98,28 @@ export function createAnimeEmbed(
                 case "CURRENT":
                 case "PAUSED":
                 case "DROPPED":
-                    return ` ${match.aniUsername} ${match.score > 0 ? `[${match.progress}] **${match.score}**` : `[${match.progress}]`}`;
+                    // return ` ${match.aniUsername} ${match.score > 0 ? `[${match.progress}] **${match.score}**` : `[${match.progress}]`}`;
+                    let str = `${match.aniUsername}`;
+                    if (match.progress > 0) {
+                        str += ` [${match.progress}]`;
+                    }
+                    if (match.score > 0) {
+                        str += `  **${match.score}**`;
+                    }
+                    if (match.repeat > 0) {
+                        str += ` (R${match.repeat})`;
+                    }
+                    return str;
                 case "COMPLETED":
-                    return `${match.aniUsername} ${match.score > 0 ? `**${match.score}**` : ""}`;
+                    //return `${match.aniUsername} ${match.score > 0 ? `**${match.score}**` : ""}`;
+                    let strC = `${match.aniUsername}`;
+                    if (match.score > 0) {
+                        strC += `  **${match.score}**`;
+                    }
+                    if (match.repeat > 0) {
+                        strC += ` (R${match.repeat})`;
+                    }
+                    return strC;
                 case "PLANNING":
                 case "NOT_ON_LIST":
                     return `${match.aniUsername} ${match.score > 0 ? `**${match.score}**` : ""}`;
@@ -105,11 +129,9 @@ export function createAnimeEmbed(
         });
 
         if (users.length > 0) {
-            const label = status === "NOT_ON_LIST"
-                ? "Not On List"
-                : status.charAt(0).toUpperCase() +
-                status.slice(1).toLowerCase();
-
+            let label = (status === "NOT_ON_LIST") 
+            ? "Not On List"
+            : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
             userScores += `**${label}**: ${users.join(" | ")}\n`;
         }
     }

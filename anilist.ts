@@ -21,6 +21,7 @@ export type UserListEntry = {
   status: string;
   score: number;
   progress: number;
+  repeat: number;
 };
 
 export type AnimeMatch = {
@@ -30,6 +31,7 @@ export type AnimeMatch = {
   score: number;
   progress: number;
   status: string;
+  repeat: number;
 };
 
 export async function registerUser(
@@ -96,6 +98,7 @@ async function fetchAniListLists(username: string) {
             status
             score(format: POINT_100)
             progress
+            repeat
           }
         }
       }
@@ -357,7 +360,6 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
     "";
   const anilistURL = media.siteUrl || "https://anilist.co";
   const score = media.meanScore || 0;
-
   const data: Record<string, any> = JSON.parse(
     fs.readFileSync(DATA_FILE, "utf-8"),
   );
@@ -379,6 +381,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
             score: entry.score,
             progress: entry.progress,
             status: entry.status,
+            repeat: entry.repeat,
           });
         }
       }
