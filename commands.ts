@@ -45,7 +45,7 @@ export function createAnimeEmbed(
     // Grouping matches by status
     const statusMap: Record<string, AnimeMatch[]> = {};
     for (const match of matches) {
-        if (match.status === "REPEATING" && match.repeat === undefined) { match.repeat = 1; }   // fix AL bs
+        if (match.status === "REPEATING" && match.repeat === 0 || undefined) { match.repeat = 1; }   // fix AL bs
         if (match.status === "REPEATING") { match.status = "CURRENT"; }   // force grouping in current
         if (!statusMap[match.status]) statusMap[match.status] = [];
         statusMap[match.status].push(match);
