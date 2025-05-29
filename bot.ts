@@ -267,9 +267,6 @@ async function translateEmbedData(message: Discord.Message) {
 
 // SPOTIFY RANDOM SONG PICKER
 
-const PLAYED_TRACKS_FILE = path.join(__dirname, "played_tracks.json");
-var PLAYED_TRACKS_NUMBER: any;
-var TOTAL_TRACKS_NUMBER: any;
 
 // Set up the Spotify API client with credentials
 const spotifyApi = new SpotifyWebApi({
@@ -288,24 +285,6 @@ async function authenticate() {
   }
 }
 
-// Load and save played tracks
-function loadPlayedTracks(): Set<string> {
-  if (fs.existsSync(PLAYED_TRACKS_FILE)) {
-    const data = fs.readFileSync(PLAYED_TRACKS_FILE, "utf8");
-    var set: Set<string> = new Set(JSON.parse(data));
-    PLAYED_TRACKS_NUMBER = set.size;
-    return set;
-  }
-  return new Set();
-}
-
-function savePlayedTracks(selectedTracks: Set<string>) {
-  fs.writeFileSync(
-    PLAYED_TRACKS_FILE,
-    JSON.stringify(Array.from(selectedTracks)),
-    "utf8",
-  );
-}
 
 // Fetch tracks from Spotify
 async function getPlaylistTracks(
@@ -355,7 +334,6 @@ async function getPlaylistTracks(
   } catch (error) {
     console.error("Failed to fetch tracks", error);
   }
-  TOTAL_TRACKS_NUMBER = trackData.length;
   return trackData;
 }
 
@@ -368,7 +346,6 @@ class PlaylistRandomizer {
     albumCover: string;
     artists: string;
   }[];
-  private selectedTracks: Set<string>;
 
   constructor(
     tracks: {
@@ -378,10 +355,8 @@ class PlaylistRandomizer {
       albumCover: string;
       artists: string;
     }[],
-    selectedTracks: Set<string>,
   ) {
     this.tracks = tracks;
-    this.selectedTracks = selectedTracks;
   }
 
   private shuffleArray(
@@ -412,23 +387,15 @@ class PlaylistRandomizer {
     albumCover: string;
     artists: string;
   } | null {
-    if (this.selectedTracks.size === this.tracks.length) {
-      console.log("All tracks have been played!");
-      return null;
-    }
 
     let shuffledTracks = this.shuffleArray([...this.tracks]);
     for (let track of shuffledTracks) {
-      if (!this.selectedTracks.has(track.uri)) {
-        this.selectedTracks.add(track.uri);
-        savePlayedTracks(this.selectedTracks);
         return {
           title: track.title,
           link: track.link,
           albumCover: track.albumCover,
           artists: track.artists,
         };
-      }
     }
 
     return null;
@@ -454,7 +421,7 @@ bot.on("ready", () => {
     }
   }
 
-  cron.schedule("0 2,14 * * *", () => {
+  cron.schedule("0 2,14,22 * * *", () => {
     console.log("Love Live time!");
     const channelId = channelIDs.loveLiveMusicChannelID;
     bot.channels.fetch(channelId, true).then((channel) =>
@@ -632,20 +599,14 @@ async function timeToLoveLive() {
     return;
   }
 
-  const playedTracks = loadPlayedTracks();
-  const playlistRandomizer = new PlaylistRandomizer(tracks, playedTracks);
+  const playlistRandomizer = new PlaylistRandomizer(tracks);
 
   const track = playlistRandomizer.getNextTrack();
   if (track) {
-    PLAYED_TRACKS_NUMBER += 1; // Count today's song
     const fullName = track.artists + " - " + track.title;
     const trackAppleMusic = fullName.replace(/ /gm, "%20");
     const trackYTMusic = fullName.replace(/ /gm, "+");
-    const today = new Date();
     const finishDate = new Date();
-    finishDate.setDate(
-      today.getDate() + (TOTAL_TRACKS_NUMBER - PLAYED_TRACKS_NUMBER),
-    );
     if (loveLiveChannel && loveLiveChannel.isText()) {
       const embed = new Discord.MessageEmbed()
         .setColor("#e4007f") // RABURAIBU
@@ -656,9 +617,7 @@ async function timeToLoveLive() {
         )
         .setImage(track.albumCover) // Set the album cover as image
         .setFooter(
-          `Completed: ${PLAYED_TRACKS_NUMBER} - Remaining: ${
-            TOTAL_TRACKS_NUMBER - PLAYED_TRACKS_NUMBER
-          } - ETA: ${finishDate.toDateString()} \nWhat the fuck did you just fucking say about μ's, you little bitch?`,
+          `What the fuck did you just fucking say about μ's, you little bitch?`,
         );
       await loveLiveChannel.send(embed);
     } else {
