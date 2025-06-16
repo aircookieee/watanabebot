@@ -429,7 +429,7 @@ bot.on("ready", () => {
     );
     timeToLoveLive();
   });
-  cron.schedule("0 * * * *", async () => {
+  cron.schedule("0 */3 * * *", async () => {
     console.log(`[${new Date().toISOString()}] Auto-updating AniList data...`);
     try {
       await AniList.updateAniListData();
