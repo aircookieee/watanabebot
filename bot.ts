@@ -421,7 +421,7 @@ bot.on("ready", () => {
     }
   }
 
-  cron.schedule("0 4 * * *", () => {
+  cron.schedule("5 4 * * *", () => {
     console.log("Love Live time!");
     const channelId = channelIDs.loveLiveMusicChannelID;
     bot.channels.fetch(channelId, true).then((channel) =>
