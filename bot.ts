@@ -551,7 +551,22 @@ bot.on("message", async (message) => {
     else if (fullQuery.length > 0) {
       const sTime = performance.now();
       await AniList.updateUserAniList(message.author.id);
-      const animeInfo = await AniList.getAnimeInfoWithScores(fullQuery);
+      let animeInfo;
+      let retries = 2;
+      while (retries > 0) {
+        try {
+          animeInfo = await AniList.getAnimeInfoWithScores(fullQuery);
+          if (animeInfo) break;
+        } catch (err) {
+          console.error("AniList query failed, retrying...", err);
+        }
+        retries--;
+        await new Promise(res => setTimeout(res, 1000));
+      }
+      if (!animeInfo) {
+        channel.send("Failed to fetch anime info after multiple attempts.");
+        return;
+      }
       const embed = createAnimeEmbed(
         animeInfo.resolvedTitle,
         animeInfo.anilistURL,

@@ -80,40 +80,55 @@ export function unregisterUser(discordId: string): boolean {
 // Update AniList data
 async function fetchAniListLists(username: string) {
   const query = `
-    query ($username: String) {
-      MediaListCollection(userName: $username, type: ANIME) {
-        lists {
-          name
-          isCustomList
-          isSplitCompletedList
-          entries {
-            media {
-              id
-              title {
-                romaji
-                english
-                native
+      query ($username: String) {
+        MediaListCollection(userName: $username, type: ANIME) {
+          lists {
+            name
+            isCustomList
+            isSplitCompletedList
+            entries {
+              media {
+                id
+                title {
+                  romaji
+                  english
+                  native
+                }
+                status
               }
               status
+              score(format: POINT_100)
+              progress
+              repeat
             }
-            status
-            score(format: POINT_100)
-            progress
-            repeat
           }
         }
       }
-    }
-  `;
+    `;
 
-  const response = await fetch(ANILIST_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ query, variables: { username } }),
-  });
+  let response;
+  const maxRetries = 2;
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      response = await fetch(ANILIST_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+      if (response) break;
+    } catch (e) {
+      console.error(`Failed to fetch lists for ${username} (attempt ${attempt + 1}):`, e);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    attempt++;
+  }
+  if (!response) {
+    throw new Error(`Unable to fetch lists for ${username} after ${maxRetries} attempts.`);
+  }
 
   type AniListResponse = {
     data: {
@@ -126,7 +141,7 @@ async function fetchAniListLists(username: string) {
     };
   };
 
-  const json = (await response.json()) as AniListResponse;
+  const json = (await response!.json()) as AniListResponse;
   return json.data.MediaListCollection.lists;
 }
 
@@ -148,14 +163,30 @@ async function fetchUserFavorites(username: string) {
         }
       }
     }`;
-  const response = await fetch(ANILIST_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ query, variables: { username } }),
-  });
+
+  let response;
+  const maxRetries = 2;
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      response = await fetch(ANILIST_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ query, variables: { username } }),
+      });
+      if (response) break;
+    } catch (e) {
+      console.error(`Failed to fetch favorites for ${username} (attempt ${attempt + 1}):`, e);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    attempt++;
+  }
+  if (!response) {
+    throw new Error(`Unable to fetch favorites for ${username} after ${maxRetries} attempts.`);
+  }
 
   type AniListResponse = {
     data: {
