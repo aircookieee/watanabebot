@@ -345,8 +345,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
       },
       body: JSON.stringify({ query: idQuery, variables }),
     });
-
-    const json = await response.json();
+    const json = await response.json() as { data?: { Media?: any } };
     media = json.data?.Media;
   } else {
     const searchQuery = `
@@ -372,7 +371,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
       body: JSON.stringify({ query: searchQuery, variables }),
     });
 
-    const json = await response.json();
+    const json = await response.json() as { data?: { Media?: any } };
     media = json.data?.Media;
   }
 

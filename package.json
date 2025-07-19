@@ -12,7 +12,8 @@
         "node-cron": "^3.0.3",
         "node-fetch": "^3.3.2",
         "spotify-web-api-node": "^5.0.2",
-        "typescript": "^5.4.5"
+        "typescript": "^5.4.5",
+        "wordnik-api": "^0.1.5"
     },
     "scripts": {
         "tsc": "tsc"

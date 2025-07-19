@@ -8,6 +8,7 @@ import SpotifyWebApi from "spotify-web-api-node";
 import * as path from "path";
 import * as AniList from "./anilist";
 import { createAnimeEmbed } from "./commands";
+import * as wordnik from "./words";
 import cron from "node-cron";
 
 const auth = require("../auth.json");
@@ -232,8 +233,8 @@ async function callAnimeThemes(arg: string, channel: Discord.TextChannel) {
   try {
     channel.send(
       "[" + animeThemesVideoData.videos["0"].filename + " (" +
-        animeThemesVideoData.videos["0"].source + ")](" +
-        animeThemesVideoData.videos["0"].link + ")",
+      animeThemesVideoData.videos["0"].source + ")](" +
+      animeThemesVideoData.videos["0"].link + ")",
     );
   } catch (err) {
     channel.send(
@@ -390,12 +391,12 @@ class PlaylistRandomizer {
 
     let shuffledTracks = this.shuffleArray([...this.tracks]);
     for (let track of shuffledTracks) {
-        return {
-          title: track.title,
-          link: track.link,
-          albumCover: track.albumCover,
-          artists: track.artists,
-        };
+      return {
+        title: track.title,
+        link: track.link,
+        albumCover: track.albumCover,
+        artists: track.artists,
+      };
     }
 
     return null;
@@ -521,6 +522,26 @@ bot.on("message", async (message) => {
     } else {
       nosoro(channel);
     }
+  } else if (content.startsWith("!define")) {
+    const args = content.trim().split(" ").slice(1);
+    if (args.length === 0) {
+      channel.send("Usage: `!define <word>`");
+      return;
+    }
+    const word = args.join(" ");
+    try {
+      const api = wordnik.initWordnik(auth.wordnikKey);
+      const data = await wordnik.getWordData(api, word);
+      if (data.error) {
+        channel.send(data.error);
+      } else {
+        const embed = wordnik.makeDiscordEmbed(data);
+        channel.send(embed);
+      }
+    } catch (error) {
+      console.error("Error fetching definitions: ", error);
+      channel.send("Something went wrong while fetching definitions");
+    }
   } else if (content.startsWith("!al")) {
     const args = content.trim().split(" ").slice(1);
     const sub = args[0]?.toLowerCase();
@@ -545,7 +566,7 @@ bot.on("message", async (message) => {
         await AniList.updateAniListData();
         await AniList.updateFavoritesData();
         const eTime = performance.now();
-        msg.edit(`AniList data updated, took ${Math.round(eTime - sTime)/1000}s.`);
+        msg.edit(`AniList data updated, took ${Math.round(eTime - sTime) / 1000}s.`);
       });
     } // Default: !al <anime name>
     else if (fullQuery.length > 0) {
