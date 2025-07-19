@@ -52,7 +52,7 @@ export function makeDiscordEmbed(wordData: Word[]): MessageEmbed {
     }
 
     const embed = new MessageEmbed()
-        .setColor(0x00ff00)
+        .setColor(0x62ACE4)
         .setTitle(`Definitions for "${definitions[0].word}"`)
         .setURL(definitions[0].wordnikUrl || "");
 
