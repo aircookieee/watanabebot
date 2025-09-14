@@ -4,6 +4,7 @@
     "description": "Yousoro~!",
     "author": "gyroknight",
     "dependencies": {
+        "@google/generative-ai": "^0.24.1",
         "@types/node": "^14.0.5",
         "axios": "^1.6.8",
         "deepl-node": "^1.12.0",

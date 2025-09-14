@@ -2,10 +2,9 @@ import Discord = require("discord.js");
 import fs = require("fs");
 import ts = require("typescript");
 import axios from "axios";
-import * as deepl from "deepl-node";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import channelIDs from "./channelsID.json";
 import SpotifyWebApi from "spotify-web-api-node";
-import * as path from "path";
 import * as AniList from "./anilist";
 import { createAnimeEmbed } from "./commands";
 import * as wordnik from "./words";
@@ -243,27 +242,39 @@ async function callAnimeThemes(arg: string, channel: Discord.TextChannel) {
   }
 }
 
+const gemini = new GoogleGenerativeAI(auth.geminiKey);
+
 async function requestTranslationData(
   messageEmbed: Discord.MessageEmbed,
 ): Promise<string> {
-  const translator = new deepl.Translator(auth.deeplAuthKey);
-  console.log("Translator created successfully");
-  if (messageEmbed.description == null) {
+  if (!messageEmbed.description) {
     console.log("Embed description empty!");
     return "";
   }
-  let tlTextResult = await translator.translateText(
-    messageEmbed.description,
-    "ja",
-    "en-US",
-  ); // let's hope this never times out
-  return tlTextResult.text;
+
+  const text = messageEmbed.description;
+  const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const prompt = `Translate the following Japanese tweet to English in a natural way, returning only the translation and nothing else:\n\n${text}`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const translation = response.text().trim();
+    return translation;
+  } catch (err) {
+    console.error("Translation error:", err);
+    return "Translation failed, something brokey <@551162527070027777>";
+  }
 }
 
 async function translateEmbedData(message: Discord.Message) {
-  let deeplOutput = await requestTranslationData(message.embeds[0]);
-  console.log("Got translation data: " + deeplOutput);
-  message.channel.send(deeplOutput);
+  if (!message.embeds || message.embeds.length === 0) {
+    console.log("No embeds found in message");
+    return;
+  }
+  const output = await requestTranslationData(message.embeds[0]);
+  console.log("Got translation data: " + output);
+  message.channel.send(output);
 }
 
 // SPOTIFY RANDOM SONG PICKER
