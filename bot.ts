@@ -553,6 +553,22 @@ bot.on("message", async (message) => {
       console.error("Error fetching definitions: ", error);
       channel.send("Something went wrong while fetching definitions");
     }
+  } else if (content.startsWith("!pick")) {
+    const raw = content.slice("!pick".length).trim();
+    if (!raw) {
+      channel.send("Usage: `!pick option1, option2, option3`");
+      return;
+    }
+    const options = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (options.length < 2) {
+      channel.send("Please provide at least two options, separated by commas.");
+      return;
+    }
+    const choice = options[Math.floor(Math.random() * options.length)];
+    channel.send(`I pick: ${choice}`);
   } else if (content.startsWith("!al")) {
     const args = content.trim().split(" ").slice(1);
     const sub = args[0]?.toLowerCase();
