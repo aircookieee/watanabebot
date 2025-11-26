@@ -8,6 +8,7 @@ import SpotifyWebApi from "spotify-web-api-node";
 import * as AniList from "./anilist";
 import { createAnimeEmbed } from "./commands";
 import * as wordnik from "./words";
+import * as Facts from "./facts";
 import cron from "node-cron";
 
 const auth = require("../auth.json");
@@ -24,6 +25,8 @@ let animeChannelID: {
 };
 let mentionSearch: RegExp;
 let commandSearch = /^!yousoro(?:$| (.+))/;
+let animeBracketSearch = /\(\(+.+?\)\)/gm;
+let mangaBracketSearch = /\[\[+.+?\]\]/gm;
 let databasePath = "database.json";
 let bot: Discord.Client;
 
@@ -456,6 +459,24 @@ bot.on("ready", () => {
       );
     }
   });
+
+  cron.schedule("5 9 * * *", async () => {
+    console.log(`[${new Date().toISOString()}] Posting daily fact...`);
+    try {
+      const factChannelId = (channelIDs as any).dailyFactsChannelID;
+      const channel = await bot.channels.fetch(factChannelId);
+      if (channel && channel.isText()) {
+        await Facts.postDailyFact(channel as Discord.TextChannel);
+      } else {
+        console.error(`Channel ${factChannelId} not found or not text-based.`);
+      }
+    } catch (e) {
+      console.error(
+        `[${new Date().toISOString()}] Failed to post daily fact:`,
+        e,
+      );
+    }
+  });
 });
 
 bot.on("guildCreate", (guild) => {
@@ -569,7 +590,23 @@ bot.on("message", async (message) => {
     }
     const choice = options[Math.floor(Math.random() * options.length)];
     channel.send(`I pick: ${choice}`);
-  } else if (content.startsWith("!al")) {
+  } else if (content.startsWith("!al") || content.startsWith("!alm") || content.match(animeBracketSearch) || content.match(mangaBracketSearch)) {
+    let mediaType: "ANIME" | "MANGA" = "ANIME";
+    let animeMatch = content.match(animeBracketSearch);
+    let mangaMatch = content.match(mangaBracketSearch);
+    if (mangaMatch) {
+      const mangaName = mangaMatch[0].replace(/[\[\]]/gm, "").trim(); // terrible bando brackets
+      content = `!alm ${mangaName}`;
+      mediaType = "MANGA";
+    } else if (animeMatch) {
+      const animeName = animeMatch[0].replace(/[()]/gm, "").trim(); 
+      content = `!al ${animeName}`;
+      mediaType = "ANIME";
+    }
+    if (content.startsWith("!alm")) { // is this a manga?
+      mediaType = "MANGA";
+    }
+    
     const args = content.trim().split(" ").slice(1);
     const sub = args[0]?.toLowerCase();
     const rest = args.slice(1).join(" ");
@@ -595,7 +632,7 @@ bot.on("message", async (message) => {
         const eTime = performance.now();
         msg.edit(`AniList data updated, took ${Math.round(eTime - sTime) / 1000}s.`);
       });
-    } // Default: !al <anime name>
+    } // Default: !al <anime name> or !alm <manga name>
     else if (fullQuery.length > 0) {
       const sTime = performance.now();
       await AniList.updateUserAniList(message.author.id);
@@ -603,7 +640,7 @@ bot.on("message", async (message) => {
       let retries = 2;
       while (retries > 0) {
         try {
-          animeInfo = await AniList.getAnimeInfoWithScores(fullQuery);
+          animeInfo = await AniList.getAnimeInfoWithScores(fullQuery, mediaType);
           if (animeInfo) break;
         } catch (err) {
           console.error("AniList query failed, retrying...", err);
@@ -623,12 +660,13 @@ bot.on("message", async (message) => {
         animeInfo.coverImage,
         animeInfo.matches,
         sTime,
+        mediaType,
       );
       channel.send(embed);
     }
     else {
       channel.send(
-        "Usage:\n• `!al <anime name>`\n• `!al register <AniList username>`\n• `!al unregister`\n• `!al update`",
+        "Usage:\n• `!al <anime name>` or `((anime name))`\n• `!alm <manga name>` or `[[manga name]]`\n• `!al register <AniList username>`\n• `!al unregister`\n• `!al update`",
       );
     }
   } else if (message.author.id != bot.user?.id) {

@@ -10,6 +10,7 @@ const FAVS_FILE = path.join(__dirname, "anilist_favorites.json");
 export type UserListEntry = {
   media: {
     id: number;
+    type?: "ANIME" | "MANGA";
     title: {
       romaji: string;
       english: string;
@@ -48,7 +49,9 @@ export async function registerUser(
 
   // Fetch user's data immediately
   try {
-    const lists = await fetchAniListLists(aniListUsername);
+    const animeLists = await fetchAniListLists(aniListUsername, "ANIME");
+    const mangaLists = await fetchAniListLists(aniListUsername, "MANGA");
+    const lists = [...animeLists, ...mangaLists];
     const data: Record<string, any> = fs.existsSync(DATA_FILE)
       ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"))
       : {};
@@ -78,10 +81,10 @@ export function unregisterUser(discordId: string): boolean {
 }
 
 // Update AniList data
-async function fetchAniListLists(username: string) {
+async function fetchAniListLists(username: string, mediaType: "ANIME" | "MANGA" = "ANIME") {
   const query = `
-      query ($username: String) {
-        MediaListCollection(userName: $username, type: ANIME) {
+      query ($username: String, $type: MediaType) {
+        MediaListCollection(userName: $username, type: $type) {
           lists {
             name
             isCustomList
@@ -89,6 +92,7 @@ async function fetchAniListLists(username: string) {
             entries {
               media {
                 id
+                type
                 title {
                   romaji
                   english
@@ -117,11 +121,11 @@ async function fetchAniListLists(username: string) {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ query, variables: { username } }),
+        body: JSON.stringify({ query, variables: { username, type: mediaType } }),
       });
       if (response) break;
     } catch (e) {
-      console.error(`Failed to fetch lists for ${username} (attempt ${attempt + 1}):`, e);
+      console.error(`Failed to fetch ${mediaType} lists for ${username} (attempt ${attempt + 1}):`, e);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     attempt++;
@@ -142,7 +146,18 @@ async function fetchAniListLists(username: string) {
   };
 
   const json = (await response!.json()) as AniListResponse;
-  return json.data.MediaListCollection.lists;
+  // Ensure every entry has a media.type (fallback to the mediaType we requested)
+  const listsWithType = json.data.MediaListCollection.lists.map((list) => ({
+    ...list,
+    entries: list.entries.map((entry) => ({
+      ...entry,
+      media: {
+        ...entry.media,
+        type: entry.media?.type ?? mediaType,
+      },
+    })),
+  }));
+  return listsWithType;
 }
 
 async function fetchUserFavorites(username: string) {
@@ -151,6 +166,16 @@ async function fetchUserFavorites(username: string) {
       User(name: $username) {
         favourites {
           anime {
+            nodes {
+              id
+              title {
+                romaji
+                english
+                native
+              }
+            }
+          }
+          manga {
             nodes {
               id
               title {
@@ -202,17 +227,34 @@ async function fetchUserFavorites(username: string) {
               };
             }[];
           };
+          manga: {
+            nodes: {
+              id: number;
+              title: {
+                romaji: string;
+                english: string;
+                native: string;
+              };
+            }[];
+          };
         };
       };
     };
   };
 
   const json = (await response.json()) as AniListResponse;
-  const favorites = json.data.User.favourites.anime.nodes.map((node) => ({
+  const animeFavs = json.data.User.favourites.anime.nodes.map((node) => ({
     id: node.id,
     title: node.title,
+    type: "ANIME",
   }));
-  return favorites;
+  const mangaFavs = json.data.User.favourites.manga.nodes.map((node) => ({
+    id: node.id,
+    title: node.title,
+    type: "MANGA",
+  }));
+
+  return [...animeFavs, ...mangaFavs];
 }
 
 export async function updateAniListData() {
@@ -227,14 +269,16 @@ export async function updateAniListData() {
   for (const [discordId, username] of Object.entries(map)) {
     try {
       const sTime = performance.now();
-      const lists = await fetchAniListLists(username);
+      const animeLists = await fetchAniListLists(username, "ANIME");
+      const mangaLists = await fetchAniListLists(username, "MANGA");
+      const lists = [...animeLists, ...mangaLists];
       const eTime = performance.now();
       data[discordId] = {
         aniUsername: username,
         lastUpdated: new Date().toISOString(),
         lists,
       };
-      console.log(`Fetched AniList data for ${username}, took ${eTime - sTime}ms`);
+      console.log(`Fetched AniList data for ${username} (anime+manga), took ${eTime - sTime}ms`);
     } catch (e) {
       console.error(`Failed to fetch for ${username}:`, e);
     }
@@ -281,7 +325,9 @@ export async function updateUserAniList(discordId: string): Promise<void> {
   if (!aniListUsername) return;
 
   try {
-    const lists = await fetchAniListLists(aniListUsername);
+    const animeLists = await fetchAniListLists(aniListUsername, "ANIME");
+    const mangaLists = await fetchAniListLists(aniListUsername, "MANGA");
+    const lists = [...animeLists, ...mangaLists];
     const data: Record<string, any> = fs.existsSync(DATA_FILE)
       ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"))
       : {};
@@ -297,7 +343,7 @@ export async function updateUserAniList(discordId: string): Promise<void> {
   }
 }
 
-export async function getAnimeInfoWithScores(searchInput: string): Promise<{
+export async function getAnimeInfoWithScores(searchInput: string, mediaType: "ANIME" | "MANGA" = "ANIME"): Promise<{
   resolvedTitle: string;
   description: string;
   anilistURL: string;
@@ -324,9 +370,10 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
 
   if (isId) {
     const idQuery = `
-      query ($id: Int) {
-        Media(id: $id, type: ANIME) {
+      query ($id: Int, $type: MediaType) {
+        Media(id: $id, type: $type) {
           id
+          type
           siteUrl
           title { romaji english native }
           description(asHtml: false)
@@ -336,7 +383,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
       }
     `;
 
-    const variables = { id: parseInt(searchInput, 10) };
+    const variables = { id: parseInt(searchInput, 10), type: mediaType };
     const response = await fetch(ANILIST_API, {
       method: "POST",
       headers: {
@@ -349,9 +396,10 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
     media = json.data?.Media;
   } else {
     const searchQuery = `
-      query ($search: String) {
-        Media(search: $search, type: ANIME) {
+      query ($search: String, $type: MediaType) {
+        Media(search: $search, type: $type) {
           id
+          type
           siteUrl
           title { romaji english native }
           description(asHtml: false)
@@ -361,7 +409,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
       }
     `;
 
-    const variables = { search: searchInput };
+    const variables = { search: searchInput, type: mediaType };
     const response = await fetch(ANILIST_API, {
       method: "POST",
       headers: {
@@ -376,9 +424,10 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
   }
 
   if (!media) {
+    const typeName = mediaType === "MANGA" ? "manga" : "anime";
     return {
       resolvedTitle: searchInput,
-      description: "No matching anime found.",
+      description: `No matching ${typeName} found.`,
       anilistURL: "https://anilist.co",
       score: 0,
       coverImage: "",
@@ -412,7 +461,8 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
     if (!Object.values(mapFile).includes(aniUsername)) continue;
     for (const list of lists) {
       for (const entry of list.entries) {
-        if (entry.media.id === media.id) {
+        // match by both id and media type so anime/manga are distinguished
+        if (entry.media.id === media.id && (entry.media.type ?? "ANIME") === (media.type ?? "ANIME")) {
           matches.push({
             discordId,
             aniUsername,
@@ -421,7 +471,7 @@ export async function getAnimeInfoWithScores(searchInput: string): Promise<{
             progress: entry.progress,
             status: entry.status,
             repeat: entry.repeat,
-            isFavorite: favData[discordId]?.favs?.some((fav: any) => fav.id === media.id) || false,
+            isFavorite: favData[discordId]?.favs?.some((fav: any) => fav.id === media.id && fav.type === (media.type ?? "ANIME")) || false,
           });
         }
       }

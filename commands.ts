@@ -15,15 +15,19 @@ export type AnimeMatch = {
 };
 
 export function createAnimeEmbed(
-    title: string, anilistURL: string, description: string, score: number, coverImage: string, matches: AnimeMatch[], sTime: number,
+title: string, anilistURL: string, description: string, score: number, coverImage: string, matches: AnimeMatch[], sTime: number, mediaType: "ANIME" | "MANGA" = "ANIME",
 ) {
+    const isAnime = mediaType === "ANIME";
+    const color = isAnime ? 0x1f8b4c : 0xff6b9d; // Green for anime, pink for manga
+    const typeLabel = isAnime ? "Anime" : "Manga";
+    
     const embed = new MessageEmbed()
-        .setTitle(title)
+        .setTitle(`${typeLabel} • ${title}`)
         .setURL(anilistURL)
         .setDescription(
             description.length > 600 ? description.slice(0, 597) + "..." : description
         )
-        .setColor(0x1f8b4c);
+        .setColor(color);
 
     if (coverImage) {
         embed.setThumbnail(coverImage);
