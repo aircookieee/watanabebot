@@ -256,7 +256,7 @@ async function requestTranslationData(
   }
 
   const text = messageEmbed.description;
-  const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = gemini.getGenerativeModel({ model: "gemini-3-flash-preview" });
   const prompt = `Translate the following Japanese tweet to English in a natural way, returning only the translation and nothing else:\n\n${text}`;
 
   try {
