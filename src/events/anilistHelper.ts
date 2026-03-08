@@ -72,7 +72,7 @@ export function createAnimeEmbed(
 
         const users = matchesForStatus.map((match) => {
             let str = `${match.aniUsername}`;
-            if (match.progress > 0) {
+            if (match.progress > 0 && match.status !== 'COMPLETED') {
                 str += ` [${match.progress}]`;
             }
             if (match.score > 0) {

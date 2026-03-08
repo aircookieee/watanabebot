@@ -224,6 +224,10 @@ export async function execute(message: Message): Promise<void> {
     if (message.mentions.has(client.user!)) {
         await message.react(config.reactions.watashiEmoji);
     }
+
+    if (message.webhookId === config.channels.musicartWebhookId) {
+        await translateWebhookMessage(channel, message);
+    }
 }
 
 async function fixTwitterEmbeds(channel: TextChannel | DMChannel, message: Message): Promise<void> {
@@ -255,5 +259,44 @@ async function fixTwitterEmbeds(channel: TextChannel | DMChannel, message: Messa
 
     if (finalMessage) {
         await channel.send(finalMessage).catch(console.error);
+    }
+}
+
+async function translateWebhookMessage(channel: TextChannel | DMChannel, message: Message): Promise<void> {
+    const apiKey = config.google.geminiApiKey;
+    if (!apiKey) {
+        console.error('Gemini API key not configured');
+        return;
+    }
+
+    const content = message.content;
+    if (!content || content.trim().length === 0) return;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: `Translate the following message to English. Only respond with the translation, nothing else:\n\n${content}` }] }],
+                generationConfig: {
+                    temperature: 0.1,
+                    maxOutputTokens: 2048,
+                }
+            })
+        });
+
+        if (!response.ok) {
+            console.error('Gemini API error:', response.status, await response.text());
+            return;
+        }
+
+        const json = await response.json() as any;
+        const translatedText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (translatedText && translatedText.trim().length > 0) {
+            await channel.send(translatedText).catch(console.error);
+        }
+    } catch (err) {
+        console.error('Error translating webhook message:', err);
     }
 }
