@@ -114,10 +114,12 @@ function initializeTables() {
 function migrateLegacyData() {
     if (!db)
         return;
-    const legacyMapPath = path_1.default.join(__dirname, '../../discordAnilistMap.json');
+    const legacyMapPath = path_1.default.join(__dirname, '../../discordAniListMap.json');
+    console.log('Checking for legacy data at:', legacyMapPath);
     if (fs_1.default.existsSync(legacyMapPath)) {
         try {
             const legacyMap = JSON.parse(fs_1.default.readFileSync(legacyMapPath, 'utf-8'));
+            console.log('Found legacy mappings:', JSON.stringify(legacyMap));
             const stmt = db.prepare(`
                 INSERT OR IGNORE INTO discord_anilist_map (discord_id, anilist_username)
                 VALUES (?, ?)
@@ -132,6 +134,9 @@ function migrateLegacyData() {
         catch (err) {
             console.error('Failed to migrate legacy data:', err);
         }
+    }
+    else {
+        console.log('No legacy mapping file found');
     }
 }
 function registerAnilistUser(discordId, anilistUsername) {

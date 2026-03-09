@@ -250,6 +250,9 @@ async function execute(message) {
     if (message.mentions.has(index_1.client.user)) {
         await message.react(config_1.default.reactions.watashiEmoji);
     }
+    if (message.webhookId === config_1.default.channels.musicartWebhookId) {
+        await translateWebhookMessage(channel, message);
+    }
 }
 async function fixTwitterEmbeds(channel, message) {
     if (message.webhookId && (!message.author || message.author.id !== config_1.default.pluralKitUid))
@@ -278,6 +281,41 @@ async function fixTwitterEmbeds(channel, message) {
     }
     if (finalMessage) {
         await channel.send(finalMessage).catch(console.error);
+    }
+}
+async function translateWebhookMessage(channel, message) {
+    const apiKey = config_1.default.google.geminiApiKey;
+    if (!apiKey) {
+        console.error('Gemini API key not configured');
+        return;
+    }
+    const content = message.content;
+    if (!content || content.trim().length === 0)
+        return;
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: `Translate the following message to English. Only respond with the translation, nothing else:\n\n${content}` }] }],
+                generationConfig: {
+                    temperature: 0.1,
+                    maxOutputTokens: 2048,
+                }
+            })
+        });
+        if (!response.ok) {
+            console.error('Gemini API error:', response.status, await response.text());
+            return;
+        }
+        const json = await response.json();
+        const translatedText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (translatedText && translatedText.trim().length > 0) {
+            await channel.send(translatedText).catch(console.error);
+        }
+    }
+    catch (err) {
+        console.error('Error translating webhook message:', err);
     }
 }
 //# sourceMappingURL=messageCreate.js.map

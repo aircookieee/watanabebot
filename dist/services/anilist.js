@@ -517,6 +517,7 @@ async function getUserFavorites(discordId, forceRefresh = false) {
         return (0, db_1.getUserFavorites)(discordId);
     }
 }
+const COMMAND_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 async function getAnimeInfoWithScores(searchInput, mediaType = 'ANIME', requesterDiscordId) {
     const media = await searchMedia(searchInput, mediaType);
     if (!media) {
@@ -532,40 +533,56 @@ async function getAnimeInfoWithScores(searchInput, mediaType = 'ANIME', requeste
     const coverImage = media.coverImage.extraLarge || media.coverImage.large || '';
     const anilistURL = media.siteUrl;
     const score = media.meanScore || 0;
+    if (requesterDiscordId) {
+        const lastRefresh = (0, db_1.getLastRefreshTime)(requesterDiscordId);
+        const needsRefresh = !lastRefresh?.lists ||
+            (Date.now() - new Date(lastRefresh.lists).getTime()) > COMMAND_REFRESH_INTERVAL_MS;
+        if (needsRefresh) {
+            await getUserLists(requesterDiscordId, true, mediaType);
+        }
+    }
     const mappings = (0, db_1.getAllAnilistMappings)();
     const matches = [];
     for (const [discordId, aniUsername] of Object.entries(mappings)) {
-        const isRequester = requesterDiscordId === discordId;
         let userLists = [];
-        if (isRequester) {
-            userLists = await getUserLists(discordId, true, mediaType);
-        }
-        else {
-            const dbEntries = (0, db_1.getUserMediaList)(discordId, mediaType);
-            if (dbEntries.length > 0) {
-                userLists = dbEntries.map(e => JSON.parse(e.entryData));
-            }
-            else {
-                continue;
-            }
+        const dbEntries = (0, db_1.getUserMediaList)(discordId, mediaType);
+        if (dbEntries.length > 0) {
+            userLists = dbEntries.map(e => JSON.parse(e.entryData));
         }
         let userFavs = [];
+        let foundEntry = null;
         for (const entry of userLists) {
             if (entry.mediaId === media.id && entry.mediaType === mediaType) {
-                if (userFavs.length === 0) {
-                    userFavs = (0, db_1.getUserFavorites)(discordId);
-                }
-                matches.push({
-                    discordId,
-                    aniUsername,
-                    listName: '',
-                    score: entry.score,
-                    progress: entry.progress,
-                    status: entry.status,
-                    repeat: entry.repeat,
-                    isFavorite: userFavs.includes(media.id),
-                });
+                foundEntry = entry;
+                break;
             }
+        }
+        if (foundEntry) {
+            if (userFavs.length === 0) {
+                userFavs = (0, db_1.getUserFavorites)(discordId);
+            }
+            matches.push({
+                discordId,
+                aniUsername,
+                listName: '',
+                score: foundEntry.score,
+                progress: foundEntry.progress,
+                status: foundEntry.status,
+                repeat: foundEntry.repeat,
+                isFavorite: userFavs.includes(media.id),
+            });
+        }
+        else {
+            matches.push({
+                discordId,
+                aniUsername,
+                listName: '',
+                score: 0,
+                progress: 0,
+                status: 'NOT_ON_LIST',
+                repeat: 0,
+                isFavorite: false,
+            });
         }
     }
     return {
