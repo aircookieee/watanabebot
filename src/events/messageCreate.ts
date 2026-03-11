@@ -265,6 +265,8 @@ async function fixTwitterEmbeds(channel: TextChannel | DMChannel, message: Messa
 import { GoogleGenAI } from '@google/genai';
 
 async function translateWebhookMessage(channel: TextChannel | DMChannel, message: Message): Promise<void> {
+    console.log('Webhook translation triggered', { webhookId: message.webhookId, expectedWebhookId: config.channels.musicartWebhookId, content: message.content });
+
     const apiKey = config.google.geminiApiKey;
     if (!apiKey) {
         console.error('Gemini API key not configured');
@@ -272,7 +274,11 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
     }
 
     const content = message.content;
-    if (!content || content.trim().length === 0) return;
+    console.log('Message content:', content);
+    if (!content || content.trim().length === 0) {
+        console.log('Empty content, skipping');
+        return;
+    }
 
     try {
         const ai = new GoogleGenAI({ apiKey });
@@ -286,6 +292,7 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
         });
 
         const translatedText = response.text;
+        console.log('Translated:', translatedText);
 
         if (translatedText && translatedText.trim().length > 0) {
             await channel.send(translatedText).catch(console.error);
