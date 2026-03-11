@@ -283,6 +283,7 @@ async function fixTwitterEmbeds(channel, message) {
         await channel.send(finalMessage).catch(console.error);
     }
 }
+const genai_1 = require("@google/genai");
 async function translateWebhookMessage(channel, message) {
     const apiKey = config_1.default.google.geminiApiKey;
     if (!apiKey) {
@@ -293,23 +294,16 @@ async function translateWebhookMessage(channel, message) {
     if (!content || content.trim().length === 0)
         return;
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: `Translate the following message to English. Only respond with the translation, nothing else:\n\n${content}` }] }],
-                generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 2048,
-                }
-            })
+        const ai = new genai_1.GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Translate this tweet from Japanese to English. Keep any eventual emojis and maintain the original tone. Only respond with the translation:\n\n${content}`,
+            config: {
+                temperature: 0.1,
+                maxOutputTokens: 2048,
+            }
         });
-        if (!response.ok) {
-            console.error('Gemini API error:', response.status, await response.text());
-            return;
-        }
-        const json = await response.json();
-        const translatedText = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        const translatedText = response.text;
         if (translatedText && translatedText.trim().length > 0) {
             await channel.send(translatedText).catch(console.error);
         }

@@ -10,15 +10,15 @@
         "deploy": "ts-node src/deploy-commands.ts"
     },
     "dependencies": {
-        "@google/generative-ai": "^0.24.1",
+        "@google/genai": "^1.44.0",
         "axios": "^1.6.8",
-        "sql.js": "^1.12.0",
-        "node-cron": "^3.0.3",
         "deepl-node": "^1.12.0",
         "discord.js": "^14.18.0",
         "dotenv": "^16.4.7",
+        "node-cron": "^3.0.3",
         "node-fetch": "^3.3.2",
         "spotify-web-api-node": "^5.0.2",
+        "sql.js": "^1.12.0",
         "wordnik-api": "^0.1.5"
     },
     "devDependencies": {
