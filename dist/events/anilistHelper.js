@@ -43,7 +43,7 @@ function createAnimeEmbed(result, sTime, mediaType = 'ANIME') {
         }
         statusMap[match.status].push(match);
     }
-    const displayOrder = ['CURRENT', 'PAUSED', 'COMPLETED', 'DROPPED', 'PLANNING', 'NOT_ON_LIST'];
+    const displayOrder = ['COMPLETED', 'CURRENT', 'PAUSED', 'DROPPED', 'PLANNING', 'NOT_ON_LIST'];
     let userScores = '';
     for (const status of displayOrder) {
         const matchesForStatus = statusMap[status];
