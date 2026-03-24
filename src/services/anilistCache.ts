@@ -45,9 +45,10 @@ export function getCachedMedia(query: string, mediaType: MediaType): any | null 
 export function setCachedMedia(query: string, mediaType: MediaType, data: any) {
     loadCache();
     const now = Date.now();
-    // Remove old entry if exists
+    // Remove expired entries and old entry for this query
     cache = cache.filter(
-        (c) => !(c.query.toLowerCase() === query.toLowerCase() && c.mediaType === mediaType)
+        (c) => now - c.timestamp < CACHE_TTL &&
+            !(c.query.toLowerCase() === query.toLowerCase() && c.mediaType === mediaType)
     );
     cache.push({ query, mediaType, data, timestamp: now });
     saveCache();

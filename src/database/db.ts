@@ -133,7 +133,7 @@ function migrateLegacyData(): void {
 export function registerAnilistUser(discordId: string, anilistUsername: string): boolean {
     if (!db) return false;
 
-    const existingUser = db.exec(`SELECT discord_id FROM discord_anilist_map WHERE anilist_username = '${anilistUsername}'`);
+    const existingUser = db.exec(`SELECT discord_id FROM discord_anilist_map WHERE anilist_username = ?`, [anilistUsername]);
     if (existingUser.length > 0 && existingUser[0].values.length > 0) {
         const existingDiscordId = existingUser[0].values[0][0] as string;
         if (existingDiscordId !== discordId) {
@@ -141,7 +141,7 @@ export function registerAnilistUser(discordId: string, anilistUsername: string):
         }
     }
     
-    const existing = db.exec(`SELECT discord_id FROM discord_anilist_map WHERE discord_id = '${discordId}'`);
+    const existing = db.exec(`SELECT discord_id FROM discord_anilist_map WHERE discord_id = ?`, [discordId]);
     
     if (existing.length > 0 && existing[0].values.length > 0) {
         db.run(`UPDATE discord_anilist_map SET anilist_username = ?, updated_at = CURRENT_TIMESTAMP WHERE discord_id = ?`, 
@@ -157,7 +157,7 @@ export function registerAnilistUser(discordId: string, anilistUsername: string):
 export function unregisterAnilistUser(discordId: string): boolean {
     if (!db) return false;
 
-    const before = db.exec(`SELECT COUNT(*) FROM discord_anilist_map WHERE discord_id = '${discordId}'`);
+    const before = db.exec(`SELECT COUNT(*) FROM discord_anilist_map WHERE discord_id = ?`, [discordId]);
     const countBefore = before[0]?.values[0]?.[0] as number || 0;
 
     if (countBefore === 0) return false;
@@ -170,7 +170,7 @@ export function unregisterAnilistUser(discordId: string): boolean {
 export function getAnilistUsername(discordId: string): string | null {
     if (!db) return null;
 
-    const result = db.exec(`SELECT anilist_username FROM discord_anilist_map WHERE discord_id = '${discordId}'`);
+    const result = db.exec(`SELECT anilist_username FROM discord_anilist_map WHERE discord_id = ?`, [discordId]);
     if (result.length > 0 && result[0].values.length > 0) {
         return result[0].values[0][0] as string;
     }
@@ -319,27 +319,20 @@ export function getLastRefreshTime(discordId: string): { lists?: string; favorit
 export function updateRefreshLog(discordId: string, refreshType: 'lists' | 'favorites'): void {
     if (!db) return;
 
-    const column = refreshType === 'lists' ? 'last_lists_refresh' : 'last_favorites_refresh';
     const value = new Date().toISOString();
 
-    const existing = db.exec(`SELECT discord_id FROM anilist_refresh_log WHERE discord_id = ?`, [discordId]);
+    // Ensure a row exists
+    db.run(`INSERT OR IGNORE INTO anilist_refresh_log (discord_id) VALUES (?)`, [discordId] as any);
 
-    if (existing.length > 0 && existing[0].values.length > 0) {
-        db.run(`UPDATE anilist_refresh_log SET ${column} = ? WHERE discord_id = ?`, [value, discordId] as any);
-    } else {
-        if (refreshType === 'lists') {
-            db.run(`INSERT INTO anilist_refresh_log (discord_id, last_lists_refresh) VALUES (?, ?)`, [discordId, value] as any);
-        } else {
-            db.run(`INSERT INTO anilist_refresh_log (discord_id, last_favorites_refresh) VALUES (?, ?)`, [discordId, value] as any);
-        }
-    }
+    const column = refreshType === 'lists' ? 'last_lists_refresh' : 'last_favorites_refresh';
+    db.run(`UPDATE anilist_refresh_log SET ${column} = ? WHERE discord_id = ?`, [value, discordId] as any);
     saveDatabase();
 }
 
 export function getGuildConfig(guildId: string): { channelId: string; mode: string } | null {
     if (!db) return null;
 
-    const result = db.exec(`SELECT channel_id, mode FROM guild_config WHERE guild_id = '${guildId}'`);
+    const result = db.exec(`SELECT channel_id, mode FROM guild_config WHERE guild_id = ?`, [guildId]);
     if (result.length > 0 && result[0].values.length > 0) {
         return {
             channelId: result[0].values[0][0] as string,
@@ -352,22 +345,15 @@ export function getGuildConfig(guildId: string): { channelId: string; mode: stri
 export function setGuildConfig(guildId: string, channelId: string, mode: string): void {
     if (!db) return;
 
-    const existing = db.exec(`SELECT guild_id FROM guild_config WHERE guild_id = '${guildId}'`);
-    
-    if (existing.length > 0 && existing[0].values.length > 0) {
-        db.run(`UPDATE guild_config SET channel_id = ?, mode = ? WHERE guild_id = ?`,
-            [channelId, mode, guildId]);
-    } else {
-        db.run(`INSERT INTO guild_config (guild_id, channel_id, mode) VALUES (?, ?, ?)`,
-            [guildId, channelId, mode]);
-    }
+    db.run(`INSERT OR REPLACE INTO guild_config (guild_id, channel_id, mode) VALUES (?, ?, ?)`,
+        [guildId, channelId, mode]);
     saveDatabase();
 }
 
 export function getSetting(key: string): string | null {
     if (!db) return null;
 
-    const result = db.exec(`SELECT value FROM settings WHERE key = '${key}'`);
+    const result = db.exec(`SELECT value FROM settings WHERE key = ?`, [key]);
     if (result.length > 0 && result[0].values.length > 0) {
         return result[0].values[0][0] as string;
     }
@@ -377,13 +363,7 @@ export function getSetting(key: string): string | null {
 export function setSetting(key: string, value: string): void {
     if (!db) return;
 
-    const existing = db.exec(`SELECT key FROM settings WHERE key = '${key}'`);
-    
-    if (existing.length > 0 && existing[0].values.length > 0) {
-        db.run(`UPDATE settings SET value = ? WHERE key = ?`, [value, key]);
-    } else {
-        db.run(`INSERT INTO settings (key, value) VALUES (?, ?)`, [key, value]);
-    }
+    db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
     saveDatabase();
 }
 

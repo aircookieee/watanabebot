@@ -1,4 +1,4 @@
-import { time } from 'console';
+
 import config from '../config/config';
 import { 
     getAllAnilistMappings, 
@@ -85,6 +85,51 @@ class RateLimiter {
 
 const rateLimiter = new RateLimiter();
 
+async function dumpAnilistFailure(
+    response: Response,
+    context: Record<string, any>,
+    prefix: string,
+    body?: any
+): Promise<void> {
+    try {
+        const dumpDir = './data/anilist_failures';
+        const fs = await import('fs');
+        if (!fs.existsSync(dumpDir)) fs.mkdirSync(dumpDir, { recursive: true });
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `${dumpDir}/${prefix}_${timestamp}_${Math.floor(Math.random() * 100000)}.json`;
+        const headersObj: Record<string, string> = {};
+        response.headers.forEach((value, key) => { headersObj[key] = value; });
+        let bodyContent = body;
+        if (bodyContent === undefined) {
+            try { bodyContent = await response.text(); }
+            catch (e) { bodyContent = `Failed to read body: ${e}`; }
+        }
+        const dump = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: headersObj,
+            url: response.url,
+            request: context,
+            body: bodyContent,
+        };
+        fs.writeFileSync(fileName, JSON.stringify(dump, null, 2), 'utf8');
+    } catch (err) {
+        console.error(`Failed to dump Anilist response (${prefix}):`, err);
+    }
+}
+
+function toSaveableEntry(entry: AnilistUserEntry, mediaType: AnilistMediaType): { mediaId: number; mediaType: string; entryData: string } {
+    const minimal: AnilistUserEntryMinimal = {
+        mediaId: entry.media.id,
+        mediaType,
+        status: entry.status,
+        score: entry.score,
+        progress: entry.progress,
+        repeat: entry.repeat,
+    };
+    return { mediaId: entry.media.id, mediaType, entryData: JSON.stringify(minimal) };
+}
+
 async function fetchAnilistLists(username: string, mediaType: AnilistMediaType): Promise<AnilistUserEntry[]> {
     const query = `
         query ($username: String, $type: MediaType) {
@@ -131,72 +176,13 @@ async function fetchAnilistLists(username: string, mediaType: AnilistMediaType):
     ) as Response;
 
     if (!response.ok) {
-        // Dump the entire response to a file
-        try {
-            const dumpDir = './data/anilist_failures';
-            const fs = await import('fs');
-            if (!fs.existsSync(dumpDir)) {
-                fs.mkdirSync(dumpDir, { recursive: true });
-            }
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const fileName = `${dumpDir}/fail_${timestamp}_${Math.floor(Math.random()*100000)}.json`;
-            const headersObj: Record<string, string> = {};
-            response.headers.forEach((value, key) => { headersObj[key] = value; });
-            let bodyText = '';
-            try {
-                bodyText = await response.text();
-            } catch (e) {
-                bodyText = `Failed to read body: ${e}`;
-            }
-            const dump = {
-                status: response.status,
-                statusText: response.statusText,
-                headers: headersObj,
-                url: response.url,
-                request: {
-                    username,
-                    mediaType,
-                    query,
-                },
-                body: bodyText,
-            };
-            fs.writeFileSync(fileName, JSON.stringify(dump, null, 2), 'utf8');
-        } catch (err) {
-            // If dumping fails, log to console
-            console.error('Failed to dump Anilist response:', err);
-        }
+        await dumpAnilistFailure(response, { username, mediaType, query }, 'fail');
         throw new Error(`Anilist API error: ${response.status}`);
     }
 
     const json = await response.json() as any;
     if (json.errors) {
-        // Dump GraphQL error response to a file
-        try {
-            const dumpDir = './data/anilist_failures';
-            const fs = await import('fs');
-            if (!fs.existsSync(dumpDir)) {
-                fs.mkdirSync(dumpDir, { recursive: true });
-            }
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const fileName = `${dumpDir}/graphql_fail_${timestamp}_${Math.floor(Math.random()*100000)}.json`;
-            const headersObj: Record<string, string> = {};
-            response.headers.forEach((value, key) => { headersObj[key] = value; });
-            const dump = {
-                status: response.status,
-                statusText: response.statusText,
-                headers: headersObj,
-                url: response.url,
-                request: {
-                    username,
-                    mediaType,
-                    query,
-                },
-                body: json,
-            };
-            fs.writeFileSync(fileName, JSON.stringify(dump, null, 2), 'utf8');
-        } catch (err) {
-            console.error('Failed to dump Anilist GraphQL error:', err);
-        }
+        await dumpAnilistFailure(response, { username, mediaType, query }, 'graphql_fail', json);
         throw new Error(`GraphQL error: ${json.errors[0].message}`);
     }
 
@@ -257,69 +243,13 @@ async function fetchUserFavorites(username: string): Promise<number[]> {
     ) as Response;
 
     if (!response.ok) {
-        // Dump the entire response to a file
-        try {
-            const dumpDir = './data/anilist_failures';
-            const fs = await import('fs');
-            if (!fs.existsSync(dumpDir)) {
-                fs.mkdirSync(dumpDir, { recursive: true });
-            }
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const fileName = `${dumpDir}/fail_favs_${timestamp}_${Math.floor(Math.random()*100000)}.json`;
-            const headersObj: Record<string, string> = {};
-            response.headers.forEach((value, key) => { headersObj[key] = value; });
-            let bodyText = '';
-            try {
-                bodyText = await response.text();
-            } catch (e) {
-                bodyText = `Failed to read body: ${e}`;
-            }
-            const dump = {
-                status: response.status,
-                statusText: response.statusText,
-                headers: headersObj,
-                url: response.url,
-                request: {
-                    username,
-                    query,
-                },
-                body: bodyText,
-            };
-            fs.writeFileSync(fileName, JSON.stringify(dump, null, 2), 'utf8');
-        } catch (err) {
-            console.error('Failed to dump Anilist favorites response:', err);
-        }
+        await dumpAnilistFailure(response, { username, query }, 'fail_favs');
         throw new Error(`Anilist API error: ${response.status}`);
     }
 
     const json = await response.json() as any;
     if (json.errors) {
-        // Dump GraphQL error response to a file
-        try {
-            const dumpDir = './data/anilist_failures';
-            const fs = await import('fs');
-            if (!fs.existsSync(dumpDir)) {
-                fs.mkdirSync(dumpDir, { recursive: true });
-            }
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const fileName = `${dumpDir}/graphql_fail_favs_${timestamp}_${Math.floor(Math.random()*100000)}.json`;
-            const headersObj: Record<string, string> = {};
-            response.headers.forEach((value, key) => { headersObj[key] = value; });
-            const dump = {
-                status: response.status,
-                statusText: response.statusText,
-                headers: headersObj,
-                url: response.url,
-                request: {
-                    username,
-                    query,
-                },
-                body: json,
-            };
-            fs.writeFileSync(fileName, JSON.stringify(dump, null, 2), 'utf8');
-        } catch (err) {
-            console.error('Failed to dump Anilist favorites GraphQL error:', err);
-        }
+        await dumpAnilistFailure(response, { username, query }, 'graphql_fail_favs', json);
         throw new Error(`GraphQL error: ${json.errors[0].message}`);
     }
 
@@ -444,19 +374,7 @@ export async function getUserLists(discordId: string, forceRefresh = false, medi
             const lists = await fetchAnilistLists(username, mediaType);
             console.log(`${new Date().toISOString()} - Fetched ${mediaType} lists for ${username}, ${lists.length} entries`);
             
-            const entriesToSave: { mediaId: number; mediaType: string; entryData: string }[] = lists.map(entry => ({
-                mediaId: entry.media.id,
-                mediaType: mediaType,
-                entryData: JSON.stringify({
-                    mediaId: entry.media.id,
-                    mediaType: mediaType,
-                    status: entry.status,
-                    score: entry.score,
-                    progress: entry.progress,
-                    repeat: entry.repeat
-                } as AnilistUserEntryMinimal)
-            }));
-            
+            const entriesToSave = lists.map(entry => toSaveableEntry(entry, mediaType));
             saveUserMediaBatch(discordId, entriesToSave);
             updateRefreshLog(discordId, 'lists');
             
@@ -465,37 +383,13 @@ export async function getUserLists(discordId: string, forceRefresh = false, medi
             const animeLists = await fetchAnilistLists(username, 'ANIME');
             console.log(`${new Date().toISOString()} - Fetched anime lists for ${username}, ${animeLists.length} entries`);
             
-            const animeEntries: { mediaId: number; mediaType: string; entryData: string }[] = animeLists.map(entry => ({
-                mediaId: entry.media.id,
-                mediaType: 'ANIME',
-                entryData: JSON.stringify({
-                    mediaId: entry.media.id,
-                    mediaType: 'ANIME',
-                    status: entry.status,
-                    score: entry.score,
-                    progress: entry.progress,
-                    repeat: entry.repeat
-                } as AnilistUserEntryMinimal)
-            }));
-            
+            const animeEntries = animeLists.map(entry => toSaveableEntry(entry, 'ANIME'));
             saveUserMediaBatch(discordId, animeEntries);
             
             const mangaLists = await fetchAnilistLists(username, 'MANGA');
             console.log(`${new Date().toISOString()} - Fetched manga lists for ${username}, ${mangaLists.length} entries`);
             
-            const mangaEntries: { mediaId: number; mediaType: string; entryData: string }[] = mangaLists.map(entry => ({
-                mediaId: entry.media.id,
-                mediaType: 'MANGA',
-                entryData: JSON.stringify({
-                    mediaId: entry.media.id,
-                    mediaType: 'MANGA',
-                    status: entry.status,
-                    score: entry.score,
-                    progress: entry.progress,
-                    repeat: entry.repeat
-                } as AnilistUserEntryMinimal)
-            }));
-            
+            const mangaEntries = mangaLists.map(entry => toSaveableEntry(entry, 'MANGA'));
             saveUserMediaBatch(discordId, mangaEntries);
             updateRefreshLog(discordId, 'lists');
             

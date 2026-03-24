@@ -44,6 +44,7 @@ const db_1 = require("../database/db");
 const anilistHelper_1 = require("./anilistHelper");
 const config_1 = __importDefault(require("../config/config"));
 const index_1 = require("../index");
+const genai_1 = require("@google/genai");
 const watashiSearch = /(?<![a-zA-Z])You(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
 const smolWatashiSearch = /(?<![a-zA-Z])you-chan(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
 const yesWatanabeSearch = /\(yes [Ww]atanabe\)/gm;
@@ -283,7 +284,6 @@ async function fixTwitterEmbeds(channel, message) {
         await channel.send(finalMessage).catch(console.error);
     }
 }
-const genai_1 = require("@google/genai");
 async function translateWebhookMessage(channel, message) {
     const apiKey = config_1.default.google.geminiApiKey;
     if (!apiKey) {

@@ -82,6 +82,15 @@ const commands: Record<string, (interaction: CommandInteraction) => Promise<void
             }
         }
     },
+    '/define': async (interaction: CommandInteraction) => {
+        await defineCommand.execute(interaction);
+    },
+    '/pick': async (interaction: CommandInteraction) => {
+        await pickerCommand.execute(interaction);
+    },
+    '/yousoro': async (interaction: CommandInteraction) => {
+        await yousoroCommand.execute(interaction);
+    },
 };
 
 export const name = Events.InteractionCreate;
@@ -90,24 +99,9 @@ export async function execute(interaction: Interaction, client: Client): Promise
     if (!interaction.isCommand()) return;
 
     const commandName = `/${interaction.commandName}`;
+    const handler = commands[commandName];
 
-    if (commands[commandName]) {
-        await commands[commandName](interaction);
-        return;
-    }
-
-    if (commandName === '/define') {
-        await defineCommand.execute(interaction);
-        return;
-    }
-
-    if (commandName === '/pick') {
-        await pickerCommand.execute(interaction);
-        return;
-    }
-
-    if (commandName === '/yousoro') {
-        await yousoroCommand.execute(interaction);
-        return;
+    if (handler) {
+        await handler(interaction);
     }
 }

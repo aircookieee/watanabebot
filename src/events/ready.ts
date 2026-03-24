@@ -1,6 +1,10 @@
-import { Events, Client } from 'discord.js';
-import { getGuildConfig } from '../database/db';
+import { Events, Client, EmbedBuilder } from 'discord.js';
+import { getGuildConfig, setGuildConfig, getAllAnilistMappings } from '../database/db';
 import config from '../config/config';
+import { getUserLists, getUserFavorites, setUpdateInProgress, updateAllUserData } from '../services/anilist';
+import { getPlaylistTracks, getRandomTrack, formatTrackForEmbed } from '../services/spotify';
+import { postDailyFact } from '../services/facts';
+import cron from 'node-cron';
 
 export const name = Events.ClientReady;
 
@@ -12,14 +16,11 @@ export async function execute(client: Client): Promise<void> {
     for (const [id, guild] of client.guilds.cache) {
         const existingConfig = getGuildConfig(id);
         if (!existingConfig) {
-            const { setGuildConfig } = await import('../database/db');
             setGuildConfig(id, '', 'everywhere');
         }
     }
 
-    const { getAllAnilistMappings: getMappings } = await import('../database/db');
-    const { getUserLists, getUserFavorites, setUpdateInProgress } = await import('../services/anilist');
-    const mappings = getMappings();
+    const mappings = getAllAnilistMappings();
     const userIds = Object.keys(mappings);
     if (userIds.length > 0) {
         setUpdateInProgress(true);
@@ -37,12 +38,10 @@ export async function execute(client: Client): Promise<void> {
 }
 
 function setupScheduledTasks(client: Client): void {
-    const cron = require('node-cron');
 
     cron.schedule('5 4 * * *', async () => {
         console.log('Love Live time!');
-        const { default: config2 } = await import('../config/config');
-        const channelId = config2.channels.loveLiveMusicChannelId;
+        const channelId = config.channels.loveLiveMusicChannelId;
         const channel = await client.channels.fetch(channelId);
         
         if (channel && channel.isTextBased()) {
@@ -53,7 +52,6 @@ function setupScheduledTasks(client: Client): void {
     cron.schedule('0 */3 * * *', async () => {
         console.log(`[${new Date().toISOString()}] Auto-updating Anilist data...`);
         try {
-            const { updateAllUserData } = await import('../services/anilist');
             await updateAllUserData();
             console.log(`[${new Date().toISOString()}] Anilist data updated successfully.`);
         } catch (e) {
@@ -64,12 +62,10 @@ function setupScheduledTasks(client: Client): void {
     cron.schedule('5 9 * * *', async () => {
         console.log(`[${new Date().toISOString()}] Posting daily fact...`);
         try {
-            const { default: config2 } = await import('../config/config');
-            const factChannelId = config2.channels.dailyFactsChannelId;
+            const factChannelId = config.channels.dailyFactsChannelId;
             const channel = await client.channels.fetch(factChannelId);
             
             if (channel && channel.isTextBased()) {
-                const { postDailyFact } = await import('../services/facts');
                 await postDailyFact(channel as any);
             }
         } catch (e) {
@@ -89,8 +85,8 @@ function setupScheduledTasks(client: Client): void {
 
 function cleanupOldLogs(): void {
     const fs = require('fs');
-    const path = require('path');
-    const failureDir = path.join(__dirname, '../../data/anilist_failures');
+    const pathMod = require('path');
+    const failureDir = pathMod.join(__dirname, '../../data/anilist_failures');
     const maxAgeDays = 7;
     const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
     const now = Date.now();
@@ -101,7 +97,7 @@ function cleanupOldLogs(): void {
     let deletedCount = 0;
 
     for (const file of files) {
-        const filePath = path.join(failureDir, file);
+        const filePath = pathMod.join(failureDir, file);
         const stats = fs.statSync(filePath);
         if (now - stats.mtimeMs > maxAgeMs) {
             fs.unlinkSync(filePath);
@@ -114,7 +110,6 @@ function cleanupOldLogs(): void {
 
 async function postLoveLive(channel: any): Promise<void> {
     try {
-        const { getPlaylistTracks, getRandomTrack, formatTrackForEmbed } = await import('../services/spotify');
         const tracks = await getPlaylistTracks();
 
         if (tracks.length === 0) {
@@ -127,7 +122,6 @@ async function postLoveLive(channel: any): Promise<void> {
 
         const { fullName, appleMusicUrl, youtubeMusicUrl } = formatTrackForEmbed(track);
 
-        const { EmbedBuilder } = await import('discord.js');
         const embed = new EmbedBuilder()
             .setColor(0xe4007f)
             .setTitle('Love Live time!')

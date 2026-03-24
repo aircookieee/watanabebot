@@ -74,27 +74,24 @@ const commands = {
             }
         }
     },
+    '/define': async (interaction) => {
+        await index_1.defineCommand.execute(interaction);
+    },
+    '/pick': async (interaction) => {
+        await index_1.pickerCommand.execute(interaction);
+    },
+    '/yousoro': async (interaction) => {
+        await index_1.yousoroCommand.execute(interaction);
+    },
 };
 exports.name = discord_js_1.Events.InteractionCreate;
 async function execute(interaction, client) {
     if (!interaction.isCommand())
         return;
     const commandName = `/${interaction.commandName}`;
-    if (commands[commandName]) {
-        await commands[commandName](interaction);
-        return;
-    }
-    if (commandName === '/define') {
-        await index_1.defineCommand.execute(interaction);
-        return;
-    }
-    if (commandName === '/pick') {
-        await index_1.pickerCommand.execute(interaction);
-        return;
-    }
-    if (commandName === '/yousoro') {
-        await index_1.yousoroCommand.execute(interaction);
-        return;
+    const handler = commands[commandName];
+    if (handler) {
+        await handler(interaction);
     }
 }
 //# sourceMappingURL=interactionCreate.js.map

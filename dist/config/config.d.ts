@@ -26,9 +26,6 @@ export declare const config: {
     paths: {
         dataDir: string;
         databasePath: string;
-        twitterTogglePath: string;
-        anilistDataPath: string;
-        anilistFavsPath: string;
     };
     reactions: {
         watashiEmoji: string;

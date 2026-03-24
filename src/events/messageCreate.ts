@@ -4,6 +4,7 @@ import { getGuildConfig, setGuildConfig, getSetting, setSetting } from '../datab
 import { createAnimeEmbed } from './anilistHelper';
 import config from '../config/config';
 import { client } from '../index';
+import { GoogleGenAI } from '@google/genai';
 
 const watashiSearch = /(?<![a-zA-Z])You(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
 const smolWatashiSearch = /(?<![a-zA-Z])you-chan(?!\s*\(not [Ww]atanabe\)|[a-zA-Z])/gm;
@@ -262,7 +263,6 @@ async function fixTwitterEmbeds(channel: TextChannel | DMChannel, message: Messa
     }
 }
 
-import { GoogleGenAI } from '@google/genai';
 
 async function translateWebhookMessage(channel: TextChannel | DMChannel, message: Message): Promise<void> {
     const apiKey = config.google.geminiApiKey;

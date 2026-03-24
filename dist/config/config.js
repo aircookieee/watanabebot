@@ -35,9 +35,6 @@ exports.config = {
     paths: {
         dataDir: path_1.default.resolve(__dirname, '../../data'),
         databasePath: path_1.default.resolve(__dirname, '../../data/watanabebot.db'),
-        twitterTogglePath: path_1.default.resolve(__dirname, '../../data/twitter.txt'),
-        anilistDataPath: path_1.default.resolve(__dirname, '../../data/anilist_data.json'),
-        anilistFavsPath: path_1.default.resolve(__dirname, '../../data/anilist_favorites.json'),
     },
     reactions: {
         watashiEmoji: '1247638024372621442',
