@@ -290,7 +290,7 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
         } catch (err) {
             console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-1.5-flash...');
             response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.1-flash-lite-preview',
                 contents: `Translate this tweet from Japanese to English. Keep any eventual emojis and maintain the original tone. Only respond with the translation:\n\n${content}`,
                 config: {
                     temperature: 0.1,
