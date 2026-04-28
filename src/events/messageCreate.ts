@@ -277,6 +277,7 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
     try {
         const ai = new GoogleGenAI({ apiKey });
         let response;
+        let backupUsed = false;
 
         try {
             response = await ai.models.generateContent({
@@ -289,6 +290,7 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
             });
         } catch (err) {
             console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-1.5-flash...');
+            backupUsed = true;
             response = await ai.models.generateContent({
                 model: 'gemini-3.1-flash-lite-preview',
                 contents: `Translate this tweet from Japanese to English. Keep any eventual emojis and maintain the original tone. Only respond with the translation:\n\n${content}`,
@@ -302,7 +304,8 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
         const translatedText = response.text;
 
         if (translatedText && translatedText.trim().length > 0) {
-            await channel.send(translatedText).catch(console.error);
+            const finalMessage = backupUsed ? `\`Backup model used\`\n${translatedText}` : translatedText;
+            await channel.send(finalMessage).catch(console.error);
         }
     } catch (err) {
         console.error('Error translating webhook message:', err);
