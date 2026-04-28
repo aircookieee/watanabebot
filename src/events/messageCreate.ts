@@ -88,9 +88,9 @@ export async function execute(message: Message): Promise<void> {
             return;
         }
         const word = args.join(' ');
-        
+
         const { getWordDefinitions, createWordEmbed } = await import('../services/wordnik');
-        
+
         try {
             const data = await getWordDefinitions(word);
             if (!data || data.length === 0) {
@@ -205,9 +205,9 @@ export async function execute(message: Message): Promise<void> {
     if (message.author.id === client.user?.id) return;
 
     const guildConfig = message.guild ? getGuildConfig(message.guild.id) : null;
-    const shouldRespond = !message.guild || 
-        !guildConfig || 
-        guildConfig.mode === 'everywhere' || 
+    const shouldRespond = !message.guild ||
+        !guildConfig ||
+        guildConfig.mode === 'everywhere' ||
         guildConfig.channelId === channel.id;
 
     if (shouldRespond) {
@@ -276,14 +276,28 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
 
     try {
         const ai = new GoogleGenAI({ apiKey });
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: `Translate this tweet from Japanese to English. Keep any eventual emojis and maintain the original tone. Only respond with the translation:\n\n${content}`,
-            config: {
-                temperature: 0.1,
-                maxOutputTokens: 2048,
-            }
-        });
+        let response;
+
+        try {
+            response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `Translate this tweet from Japanese to English. Keep any eventual emojis and maintain the original tone. Only respond with the translation:\n\n${content}`,
+                config: {
+                    temperature: 0.1,
+                    maxOutputTokens: 2048,
+                }
+            });
+        } catch (err) {
+            console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-1.5-flash...');
+            response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Translate this tweet from Japanese to English. Keep any eventual emojis and maintain the original tone. Only respond with the translation:\n\n${content}`,
+                config: {
+                    temperature: 0.1,
+                    maxOutputTokens: 2048,
+                }
+            });
+        }
 
         const translatedText = response.text;
 
