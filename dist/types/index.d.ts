@@ -75,5 +75,61 @@ export interface SpotifyTrack {
     albumCover: string;
     artists: string;
 }
+export interface Wallet {
+    userId: string;
+    guildId: string;
+    balance: number;
+    totalEarned: number;
+    totalSpent: number;
+}
+export interface WalletTransaction {
+    id: number;
+    userId: string;
+    guildId: string;
+    amount: number;
+    reason: string;
+    referenceId?: string;
+    balanceAfter: number;
+    createdAt: string;
+}
+export interface Tournament {
+    id: number;
+    guildId: string;
+    name: string;
+    status: 'active' | 'completed';
+}
+export interface TournamentMatch {
+    id: number;
+    tournamentId: number;
+    matchNumber: number;
+    contestantA: string;
+    contestantB: string;
+    winner: 'a' | 'b' | null;
+    bettingOpen: boolean;
+}
+export interface Bet {
+    id: number;
+    tournamentId: number;
+    matchId: number;
+    userId: string;
+    guildId: string;
+    picked: 'a' | 'b';
+    amount: number;
+    status: 'pending' | 'won' | 'lost';
+    payout: number;
+}
+export interface MatchResolutionSummary {
+    matchNumber: number;
+    contestantA: string;
+    contestantB: string;
+    winner: string;
+    totalPool: number;
+    winnerPool: number;
+    payouts: {
+        userId: string;
+        betAmount: number;
+        payout: number;
+    }[];
+}
 export { Client, TextChannel, DMChannel, GuildTextBasedChannel };
 //# sourceMappingURL=index.d.ts.map

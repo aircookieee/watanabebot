@@ -57,6 +57,9 @@ exports.name = discord_js_1.Events.MessageCreate;
 async function execute(message) {
     if (message.author.bot && !message.webhookId)
         return;
+    if (!message.author.bot && message.guild?.id === config_1.default.currency.guildId) {
+        (0, db_1.addCurrency)(message.author.id, message.guild.id, 1, 'message');
+    }
     const channel = message.channel;
     if (!(channel instanceof discord_js_1.TextChannel) && !(channel instanceof discord_js_1.DMChannel))
         return;
@@ -308,7 +311,7 @@ async function translateWebhookMessage(channel, message) {
             });
         }
         catch (err) {
-            console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-1.5-flash...');
+            console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-3.1-flash-lite...');
             backupUsed = true;
             response = await ai.models.generateContent({
                 model: 'gemini-3.1-flash-lite-preview',

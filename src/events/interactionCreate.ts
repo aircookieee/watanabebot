@@ -1,6 +1,8 @@
-import { Events, Interaction, Client, CommandInteraction } from 'discord.js';
+import { Events, Interaction, Client, CommandInteraction, StringSelectMenuInteraction, ButtonInteraction, ModalSubmitInteraction } from 'discord.js';
 import { getAnimeInfoWithScores, registerUser, unregisterUser, updateAllUserData, isUpdateInProgress } from '../services/anilist';
 import { defineCommand, pickerCommand, yousoroCommand } from '../commands/index';
+import { currencyCommand } from '../commands/currency';
+import { tournamentCommand, handleSelectMatch, handleContestantPick, handleBetSubmit } from '../commands/tournament';
 import { createAnimeEmbed } from './anilistHelper';
 
 const commands: Record<string, (interaction: CommandInteraction) => Promise<void>> = {
@@ -91,17 +93,35 @@ const commands: Record<string, (interaction: CommandInteraction) => Promise<void
     '/yousoro': async (interaction: CommandInteraction) => {
         await yousoroCommand.execute(interaction);
     },
+    '/youcoin': async (interaction: CommandInteraction) => {
+        await currencyCommand.execute(interaction);
+    },
+    '/tournament': async (interaction: CommandInteraction) => {
+        await tournamentCommand.execute(interaction);
+    },
 };
 
 export const name = Events.InteractionCreate;
 
 export async function execute(interaction: Interaction, client: Client): Promise<void> {
-    if (!interaction.isCommand()) return;
+    if (interaction.isCommand()) {
+        const commandName = `/${interaction.commandName}`;
+        const handler = commands[commandName];
 
-    const commandName = `/${interaction.commandName}`;
-    const handler = commands[commandName];
-
-    if (handler) {
-        await handler(interaction);
+        if (handler) {
+            await handler(interaction);
+        }
+    } else if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'tournament_bet_select_match') {
+            await handleSelectMatch(interaction);
+        }
+    } else if (interaction.isButton()) {
+        if (interaction.customId.startsWith('tournament_bet_pick_')) {
+            await handleContestantPick(interaction);
+        }
+    } else if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('tournament_bet_modal:')) {
+            await handleBetSubmit(interaction);
+        }
     }
 }

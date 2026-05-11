@@ -42,6 +42,16 @@ exports.config = {
         yesWatanabeEmoji: '1247638018949644298',
     },
     pluralKitUid: '466378653216014359',
+    currency: {
+        guildId: process.env.CURRENCY_GUILD_ID || '',
+        startingBalance: 500,
+    },
+    admin: {
+        userId: process.env.ADMIN_USER_ID || '',
+    },
+    tournament: {
+        operatorId: process.env.TOURNAMENT_OPERATOR_ID || '',
+    },
 };
 exports.default = exports.config;
 //# sourceMappingURL=config.js.map

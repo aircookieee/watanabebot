@@ -87,6 +87,8 @@ async function deployCommands() {
             .addSubcommand(sub => sub.setName('here').setDescription('React only here'))
             .addSubcommand(sub => sub.setName('everywhere').setDescription('React everywhere'))
             .addSubcommand(sub => sub.setName('twitter').setDescription('Twitter toggle').addStringOption(opt => opt.setName('toggle').setDescription('on/off').setRequired(true).addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' }))),
+        (await Promise.resolve().then(() => __importStar(require('./commands/currency')))).currencyCommand.data,
+        (await Promise.resolve().then(() => __importStar(require('./commands/tournament')))).tournamentCommand.data,
     ];
     try {
         console.log('Deploying slash commands...');

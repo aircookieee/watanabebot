@@ -1,6 +1,6 @@
 import { Events, Message, TextChannel, DMChannel } from 'discord.js';
 import { getAnimeInfoWithScores, registerUser, unregisterUser, updateAllUserData } from '../services/anilist';
-import { getGuildConfig, setGuildConfig, getSetting, setSetting } from '../database/db';
+import { getGuildConfig, setGuildConfig, getSetting, setSetting, addCurrency } from '../database/db';
 import { createAnimeEmbed } from './anilistHelper';
 import config from '../config/config';
 import { client } from '../index';
@@ -19,6 +19,10 @@ export const name = Events.MessageCreate;
 
 export async function execute(message: Message): Promise<void> {
     if (message.author.bot && !message.webhookId) return;
+
+    if (!message.author.bot && message.guild?.id === config.currency.guildId) {
+        addCurrency(message.author.id, message.guild.id, 1, 'message');
+    }
 
     const channel = message.channel;
     if (!(channel instanceof TextChannel) && !(channel instanceof DMChannel)) return;
@@ -289,7 +293,7 @@ async function translateWebhookMessage(channel: TextChannel | DMChannel, message
                 }
             });
         } catch (err) {
-            console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-1.5-flash...');
+            console.warn('Model gemini-3-flash-preview failed or is overloaded, retrying with gemini-3.1-flash-lite...');
             backupUsed = true;
             response = await ai.models.generateContent({
                 model: 'gemini-3.1-flash-lite-preview',

@@ -5,6 +5,8 @@ exports.execute = execute;
 const discord_js_1 = require("discord.js");
 const anilist_1 = require("../services/anilist");
 const index_1 = require("../commands/index");
+const currency_1 = require("../commands/currency");
+const tournament_1 = require("../commands/tournament");
 const anilistHelper_1 = require("./anilistHelper");
 const commands = {
     '/anime': async (interaction) => {
@@ -83,15 +85,36 @@ const commands = {
     '/yousoro': async (interaction) => {
         await index_1.yousoroCommand.execute(interaction);
     },
+    '/youcoin': async (interaction) => {
+        await currency_1.currencyCommand.execute(interaction);
+    },
+    '/tournament': async (interaction) => {
+        await tournament_1.tournamentCommand.execute(interaction);
+    },
 };
 exports.name = discord_js_1.Events.InteractionCreate;
 async function execute(interaction, client) {
-    if (!interaction.isCommand())
-        return;
-    const commandName = `/${interaction.commandName}`;
-    const handler = commands[commandName];
-    if (handler) {
-        await handler(interaction);
+    if (interaction.isCommand()) {
+        const commandName = `/${interaction.commandName}`;
+        const handler = commands[commandName];
+        if (handler) {
+            await handler(interaction);
+        }
+    }
+    else if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'tournament_bet_select_match') {
+            await (0, tournament_1.handleSelectMatch)(interaction);
+        }
+    }
+    else if (interaction.isButton()) {
+        if (interaction.customId.startsWith('tournament_bet_pick_')) {
+            await (0, tournament_1.handleContestantPick)(interaction);
+        }
+    }
+    else if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('tournament_bet_modal:')) {
+            await (0, tournament_1.handleBetSubmit)(interaction);
+        }
     }
 }
 //# sourceMappingURL=interactionCreate.js.map

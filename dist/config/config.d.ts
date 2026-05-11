@@ -33,6 +33,16 @@ export declare const config: {
         yesWatanabeEmoji: string;
     };
     pluralKitUid: string;
+    currency: {
+        guildId: string;
+        startingBalance: number;
+    };
+    admin: {
+        userId: string;
+    };
+    tournament: {
+        operatorId: string;
+    };
 };
 export default config;
 //# sourceMappingURL=config.d.ts.map

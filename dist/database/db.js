@@ -21,6 +21,24 @@ exports.getGuildConfig = getGuildConfig;
 exports.setGuildConfig = setGuildConfig;
 exports.getSetting = getSetting;
 exports.setSetting = setSetting;
+exports.getOrCreateWallet = getOrCreateWallet;
+exports.getBalance = getBalance;
+exports.addCurrency = addCurrency;
+exports.spendCurrency = spendCurrency;
+exports.setBalance = setBalance;
+exports.getLeaderboard = getLeaderboard;
+exports.createTournament = createTournament;
+exports.addTournamentMatch = addTournamentMatch;
+exports.getActiveTournament = getActiveTournament;
+exports.getTournamentMatches = getTournamentMatches;
+exports.getMatch = getMatch;
+exports.getMatchByNumber = getMatchByNumber;
+exports.closeBettingForMatch = closeBettingForMatch;
+exports.placeBet = placeBet;
+exports.getBetsForMatch = getBetsForMatch;
+exports.getUserBets = getUserBets;
+exports.resolveMatch = resolveMatch;
+exports.endTournament = endTournament;
 exports.closeDatabase = closeDatabase;
 const sql_js_1 = __importDefault(require("sql.js"));
 const fs_1 = __importDefault(require("fs"));
@@ -108,6 +126,67 @@ function initializeTables() {
             discord_id TEXT PRIMARY KEY,
             last_lists_refresh TEXT,
             last_favorites_refresh TEXT
+        )
+    `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS wallets (
+            user_id TEXT NOT NULL,
+            guild_id TEXT NOT NULL,
+            balance INTEGER NOT NULL DEFAULT 500,
+            total_earned INTEGER NOT NULL DEFAULT 0,
+            total_spent INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, guild_id)
+        )
+    `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS wallet_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            guild_id TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            reference_id TEXT,
+            balance_after INTEGER NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS tournaments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS tournament_matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER NOT NULL,
+            match_number INTEGER NOT NULL,
+            contestant_a TEXT NOT NULL,
+            contestant_b TEXT NOT NULL,
+            winner TEXT,
+            betting_open INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
+        )
+    `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER NOT NULL,
+            match_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            guild_id TEXT NOT NULL,
+            picked TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            payout INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tournament_id, match_id, user_id),
+            FOREIGN KEY (tournament_id) REFERENCES tournaments(id),
+            FOREIGN KEY (match_id) REFERENCES tournament_matches(id)
         )
     `);
 }
@@ -341,6 +420,289 @@ function setSetting(key, value) {
     if (!db)
         return;
     db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
+    saveDatabase();
+}
+function getOrCreateWallet(userId, guildId) {
+    if (!db)
+        return { balance: 0, totalEarned: 0, totalSpent: 0 };
+    const result = db.exec(`SELECT balance, total_earned, total_spent FROM wallets WHERE user_id = ? AND guild_id = ?`, [userId, guildId]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        const row = result[0].values[0];
+        return {
+            balance: row[0],
+            totalEarned: row[1],
+            totalSpent: row[2],
+        };
+    }
+    db.run(`INSERT INTO wallets (user_id, guild_id, balance) VALUES (?, ?, ?)`, [userId, guildId, config_1.default.currency.startingBalance]);
+    saveDatabase();
+    return { balance: config_1.default.currency.startingBalance, totalEarned: 0, totalSpent: 0 };
+}
+function getBalance(userId, guildId) {
+    return getOrCreateWallet(userId, guildId).balance;
+}
+function addCurrency(userId, guildId, amount, reason, refId = null) {
+    if (!db || amount <= 0)
+        return;
+    const wallet = getOrCreateWallet(userId, guildId);
+    const newBalance = wallet.balance + amount;
+    const newEarned = wallet.totalEarned + amount;
+    db.run(`UPDATE wallets SET balance = ?, total_earned = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [newBalance, newEarned, userId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, reference_id, balance_after) VALUES (?, ?, ?, ?, ?, ?)`, [userId, guildId, amount, reason, refId, newBalance]);
+    saveDatabase();
+}
+function spendCurrency(userId, guildId, amount, reason, refId = null) {
+    if (!db || amount <= 0)
+        return false;
+    const wallet = getOrCreateWallet(userId, guildId);
+    if (wallet.balance < amount)
+        return false;
+    const newBalance = wallet.balance - amount;
+    const newSpent = wallet.totalSpent + amount;
+    db.run(`UPDATE wallets SET balance = ?, total_spent = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [newBalance, newSpent, userId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, reference_id, balance_after) VALUES (?, ?, ?, ?, ?, ?)`, [userId, guildId, -amount, reason, refId, newBalance]);
+    saveDatabase();
+    return true;
+}
+function setBalance(userId, guildId, amount, reason) {
+    if (!db || amount < 0)
+        return;
+    const wallet = getOrCreateWallet(userId, guildId);
+    const diff = amount - wallet.balance;
+    if (diff === 0)
+        return;
+    db.run(`UPDATE wallets SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [amount, userId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, balance_after) VALUES (?, ?, ?, ?, ?)`, [userId, guildId, diff, reason, amount]);
+    saveDatabase();
+}
+function getLeaderboard(guildId, limit) {
+    if (!db)
+        return [];
+    const result = db.exec(`SELECT user_id, balance FROM wallets WHERE guild_id = ? ORDER BY balance DESC LIMIT ?`, [guildId, limit]);
+    const leaderboard = [];
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            leaderboard.push({
+                userId: row[0],
+                balance: row[1],
+            });
+        }
+    }
+    return leaderboard;
+}
+// Tournament Functions
+function createTournament(guildId, name) {
+    if (!db)
+        return null;
+    db.run(`INSERT INTO tournaments (guild_id, name) VALUES (?, ?)`, [guildId, name]);
+    const result = db.exec(`SELECT last_insert_rowid()`);
+    saveDatabase();
+    return result[0].values[0][0];
+}
+function addTournamentMatch(tournamentId, matchNum, contestantA, contestantB) {
+    if (!db)
+        return;
+    db.run(`INSERT INTO tournament_matches (tournament_id, match_number, contestant_a, contestant_b) VALUES (?, ?, ?, ?)`, [tournamentId, matchNum, contestantA, contestantB]);
+    saveDatabase();
+}
+function getActiveTournament(guildId) {
+    if (!db)
+        return null;
+    const result = db.exec(`SELECT id, name FROM tournaments WHERE guild_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1`, [guildId]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        return {
+            id: result[0].values[0][0],
+            name: result[0].values[0][1],
+        };
+    }
+    return null;
+}
+function getTournamentMatches(tournamentId) {
+    if (!db)
+        return [];
+    const result = db.exec(`SELECT id, match_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? ORDER BY match_number ASC`, [tournamentId]);
+    const matches = [];
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            matches.push({
+                id: row[0],
+                matchNumber: row[1],
+                contestantA: row[2],
+                contestantB: row[3],
+                winner: row[4],
+                bettingOpen: row[5] === 1,
+            });
+        }
+    }
+    return matches;
+}
+function getMatch(matchId) {
+    if (!db)
+        return null;
+    const result = db.exec(`SELECT tournament_id, match_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE id = ?`, [matchId]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        const row = result[0].values[0];
+        return {
+            id: matchId,
+            tournamentId: row[0],
+            matchNumber: row[1],
+            contestantA: row[2],
+            contestantB: row[3],
+            winner: row[4],
+            bettingOpen: row[5] === 1,
+        };
+    }
+    return null;
+}
+function getMatchByNumber(tournamentId, matchNumber) {
+    if (!db)
+        return null;
+    const result = db.exec(`SELECT id, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? AND match_number = ?`, [tournamentId, matchNumber]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        const row = result[0].values[0];
+        return {
+            id: row[0],
+            tournamentId: tournamentId,
+            matchNumber: matchNumber,
+            contestantA: row[1],
+            contestantB: row[2],
+            winner: row[3],
+            bettingOpen: row[4] === 1,
+        };
+    }
+    return null;
+}
+function closeBettingForMatch(matchId) {
+    if (!db)
+        return;
+    db.run(`UPDATE tournament_matches SET betting_open = 0 WHERE id = ?`, [matchId]);
+    saveDatabase();
+}
+function placeBet(tournamentId, matchId, userId, guildId, picked, amount) {
+    if (!db)
+        return false;
+    // Must have balance
+    if (!spendCurrency(userId, guildId, amount, 'bet_place', matchId.toString())) {
+        return false;
+    }
+    try {
+        db.run(`INSERT INTO bets (tournament_id, match_id, user_id, guild_id, picked, amount) VALUES (?, ?, ?, ?, ?, ?)`, [tournamentId, matchId, userId, guildId, picked, amount]);
+        saveDatabase();
+        return true;
+    }
+    catch (e) {
+        // Reverse spend if bet insert fails (e.g. duplicate bet)
+        addCurrency(userId, guildId, amount, 'bet_refund', matchId.toString());
+        return false;
+    }
+}
+function getBetsForMatch(tournamentId, matchId) {
+    if (!db)
+        return [];
+    const result = db.exec(`SELECT user_id, picked, amount FROM bets WHERE tournament_id = ? AND match_id = ?`, [tournamentId, matchId]);
+    const bets = [];
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            bets.push({
+                userId: row[0],
+                picked: row[1],
+                amount: row[2],
+            });
+        }
+    }
+    return bets;
+}
+function getUserBets(tournamentId, userId) {
+    if (!db)
+        return [];
+    const result = db.exec(`
+        SELECT b.match_id, b.picked, b.amount, b.status, b.payout, m.match_number, m.contestant_a, m.contestant_b, m.winner
+        FROM bets b
+        JOIN tournament_matches m ON b.match_id = m.id
+        WHERE b.tournament_id = ? AND b.user_id = ?
+        ORDER BY m.match_number ASC
+    `, [tournamentId, userId]);
+    const bets = [];
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            bets.push({
+                matchId: row[0],
+                picked: row[1],
+                amount: row[2],
+                status: row[3],
+                payout: row[4],
+                matchNumber: row[5],
+                contestantA: row[6],
+                contestantB: row[7],
+                winner: row[8],
+            });
+        }
+    }
+    return bets;
+}
+function resolveMatch(tournamentId, matchId, winner) {
+    if (!db)
+        return null;
+    closeBettingForMatch(matchId);
+    db.run(`UPDATE tournament_matches SET winner = ? WHERE id = ?`, [winner, matchId]);
+    const bets = getBetsForMatch(tournamentId, matchId);
+    let totalPool = 0;
+    let winnerPool = 0;
+    for (const bet of bets) {
+        totalPool += bet.amount;
+        if (bet.picked === winner) {
+            winnerPool += bet.amount;
+        }
+    }
+    const payouts = [];
+    // Fetch guild_id from tournament
+    let guildId = '';
+    const tournamentResult = db.exec(`SELECT guild_id FROM tournaments WHERE id = ?`, [tournamentId]);
+    if (tournamentResult.length > 0 && tournamentResult[0].values.length > 0) {
+        guildId = tournamentResult[0].values[0][0];
+    }
+    // Process winners
+    for (const bet of bets) {
+        if (bet.picked === winner) {
+            let payout = 0;
+            if (winnerPool > 0) {
+                // Parimutuel calculation
+                const proportion = bet.amount / winnerPool;
+                payout = Math.floor(proportion * totalPool);
+            }
+            db.run(`UPDATE bets SET status = 'won', payout = ? WHERE tournament_id = ? AND match_id = ? AND user_id = ?`, [payout, tournamentId, matchId, bet.userId]);
+            if (guildId) {
+                addCurrency(bet.userId, guildId, payout, 'bet_win', matchId.toString());
+            }
+            payouts.push({ userId: bet.userId, betAmount: bet.amount, payout });
+        }
+        else {
+            db.run(`UPDATE bets SET status = 'lost' WHERE tournament_id = ? AND match_id = ? AND user_id = ?`, [tournamentId, matchId, bet.userId]);
+        }
+    }
+    saveDatabase();
+    return {
+        totalPool,
+        winnerPool,
+        payouts
+    };
+}
+function endTournament(tournamentId) {
+    if (!db)
+        return;
+    db.run(`UPDATE tournaments SET status = 'completed' WHERE id = ?`, [tournamentId]);
+    // Refund pending bets
+    const result = db.exec(`SELECT match_id, user_id, guild_id, amount FROM bets WHERE tournament_id = ? AND status = 'pending'`, [tournamentId]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            const matchId = row[0];
+            const userId = row[1];
+            const guildId = row[2];
+            const amount = row[3];
+            addCurrency(userId, guildId, amount, 'bet_refund_ended', matchId.toString());
+            db.run(`UPDATE bets SET status = 'refunded' WHERE tournament_id = ? AND match_id = ? AND user_id = ?`, [tournamentId, matchId, userId]);
+        }
+    }
     saveDatabase();
 }
 function closeDatabase() {
