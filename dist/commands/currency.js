@@ -9,15 +9,15 @@ const db_1 = require("../database/db");
 const config_1 = __importDefault(require("../config/config"));
 exports.currencyCommand = {
     data: new discord_js_1.SlashCommandBuilder()
-        .setName('youcoin')
-        .setDescription('Manage your YouCoins')
+        .setName('mugcoin')
+        .setDescription('Manage your MugCoins')
         .addSubcommand(sub => sub.setName('balance')
-        .setDescription('Check your YouCoin balance')
+        .setDescription('Check your MugCoin balance')
         .addUserOption(opt => opt.setName('user').setDescription('User to check (optional)')))
         .addSubcommand(sub => sub.setName('leaderboard')
         .setDescription('View the top 10 richest users'))
         .addSubcommand(sub => sub.setName('pay')
-        .setDescription('Pay YouCoins to another user')
+        .setDescription('Pay MugCoins to another user')
         .addUserOption(opt => opt.setName('user').setDescription('User to pay').setRequired(true))
         .addIntegerOption(opt => opt.setName('amount').setDescription('Amount to pay').setRequired(true)))
         .addSubcommandGroup(group => group.setName('admin')
@@ -27,11 +27,11 @@ exports.currencyCommand = {
         .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .addIntegerOption(opt => opt.setName('amount').setDescription('New balance').setRequired(true)))
         .addSubcommand(sub => sub.setName('give')
-        .setDescription('Give YouCoins to a user')
+        .setDescription('Give MugCoins to a user')
         .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .addIntegerOption(opt => opt.setName('amount').setDescription('Amount to give').setRequired(true)))
         .addSubcommand(sub => sub.setName('take')
-        .setDescription('Take YouCoins from a user')
+        .setDescription('Take MugCoins from a user')
         .addUserOption(opt => opt.setName('user').setDescription('Target user').setRequired(true))
         .addIntegerOption(opt => opt.setName('amount').setDescription('Amount to take').setRequired(true)))),
     execute: async (interaction) => {
@@ -40,7 +40,7 @@ exports.currencyCommand = {
             return;
         }
         if (interaction.guild.id !== config_1.default.currency.guildId) {
-            await interaction.reply({ content: 'YouCoins cannot be used in this server.', ephemeral: true });
+            await interaction.reply({ content: 'MugCoins cannot be used in this server.', ephemeral: true });
             return;
         }
         const options = interaction.options;
@@ -59,7 +59,7 @@ exports.currencyCommand = {
                     return;
                 }
                 (0, db_1.setBalance)(targetUser.id, interaction.guild.id, amount, 'admin_set');
-                await interaction.reply(`Set ${targetUser.username}'s balance to **${amount}** YouCoins.`);
+                await interaction.reply(`Set ${targetUser.username}'s balance to **${amount}** MugCoins.`);
             }
             else if (subcommand === 'give') {
                 if (amount <= 0) {
@@ -67,7 +67,7 @@ exports.currencyCommand = {
                     return;
                 }
                 (0, db_1.addCurrency)(targetUser.id, interaction.guild.id, amount, 'admin_give');
-                await interaction.reply(`Gave **${amount}** YouCoins to ${targetUser.username}.`);
+                await interaction.reply(`Gave **${amount}** MugCoins to ${targetUser.username}.`);
             }
             else if (subcommand === 'take') {
                 if (amount <= 0) {
@@ -76,10 +76,10 @@ exports.currencyCommand = {
                 }
                 const success = (0, db_1.spendCurrency)(targetUser.id, interaction.guild.id, amount, 'admin_take');
                 if (success) {
-                    await interaction.reply(`Took **${amount}** YouCoins from ${targetUser.username}.`);
+                    await interaction.reply(`Took **${amount}** MugCoins from ${targetUser.username}.`);
                 }
                 else {
-                    await interaction.reply({ content: `${targetUser.username} does not have enough YouCoins.`, ephemeral: true });
+                    await interaction.reply({ content: `${targetUser.username} does not have enough MugCoins.`, ephemeral: true });
                 }
             }
             return;
@@ -90,24 +90,24 @@ exports.currencyCommand = {
             const embed = new discord_js_1.EmbedBuilder()
                 .setColor(0x00bfff) // You Watanabe color
                 .setTitle(`${targetUser.username}'s Wallet`)
-                .setDescription(`**Balance:** ${balance} YouCoins`)
+                .setDescription(`**Balance:** ${balance} MugCoins`)
                 .setThumbnail(targetUser.displayAvatarURL());
             await interaction.reply({ embeds: [embed] });
         }
         else if (subcommand === 'leaderboard') {
             const leaderboard = (0, db_1.getLeaderboard)(interaction.guild.id, 10);
             if (leaderboard.length === 0) {
-                await interaction.reply('No users have YouCoins yet.');
+                await interaction.reply('No users have MugCoins yet.');
                 return;
             }
             let description = '';
             for (let i = 0; i < leaderboard.length; i++) {
                 const entry = leaderboard[i];
-                description += `**${i + 1}.** <@${entry.userId}> — ${entry.balance} YouCoins\n`;
+                description += `**${i + 1}.** <@${entry.userId}> — ${entry.balance} MugCoins\n`;
             }
             const embed = new discord_js_1.EmbedBuilder()
                 .setColor(0x00bfff)
-                .setTitle('YouCoin Leaderboard')
+                .setTitle('MugCoin Leaderboard')
                 .setDescription(description);
             await interaction.reply({ embeds: [embed] });
         }
@@ -115,7 +115,7 @@ exports.currencyCommand = {
             const targetUser = options.getUser('user');
             const amount = options.getInteger('amount');
             if (targetUser.id === interaction.user.id) {
-                await interaction.reply({ content: 'You cannot send YouCoins to yourself.', ephemeral: true });
+                await interaction.reply({ content: 'You cannot send MugCoins to yourself.', ephemeral: true });
                 return;
             }
             if (amount <= 0) {
@@ -123,7 +123,7 @@ exports.currencyCommand = {
                 return;
             }
             if (targetUser.bot) {
-                await interaction.reply({ content: 'You cannot send YouCoins to bots.', ephemeral: true });
+                await interaction.reply({ content: 'You cannot send MugCoins to bots.', ephemeral: true });
                 return;
             }
             const success = (0, db_1.transferCurrency)(interaction.user.id, targetUser.id, interaction.guild.id, amount);
@@ -131,7 +131,7 @@ exports.currencyCommand = {
                 await interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
                 return;
             }
-            await interaction.reply(`💸 **${interaction.user.username}** has sent **${amount}** YouCoins to **${targetUser.username}**!`);
+            await interaction.reply(`💸 **${interaction.user.username}** has sent **${amount}** MugCoins to **${targetUser.username}**!`);
         }
     }
 };

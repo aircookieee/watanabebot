@@ -85,7 +85,7 @@ const commands = {
     '/yousoro': async (interaction) => {
         await index_1.yousoroCommand.execute(interaction);
     },
-    '/youcoin': async (interaction) => {
+    '/mugcoin': async (interaction) => {
         await currency_1.currencyCommand.execute(interaction);
     },
     '/tournament': async (interaction) => {

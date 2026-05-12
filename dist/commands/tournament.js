@@ -138,7 +138,7 @@ exports.tournamentCommand = {
             const embed = new discord_js_1.EmbedBuilder()
                 .setColor(0x00bfff)
                 .setTitle(`Betting Panel: ${activeTournament.name}`)
-                .setDescription(`Your balance: **${balance} YouCoins**\n\nSelect a match from the dropdown below to view odds and place your bet.`);
+                .setDescription(`Your balance: **${balance} MugCoins**\n\nSelect a match from the dropdown below to view odds and place your bet.`);
             await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
         }
         else if (subcommand === 'mybets') {
@@ -247,12 +247,12 @@ exports.tournamentCommand = {
             desc += `**Final Pool Breakdown:**\n`;
             desc += `**${match.contestantA}**: ${poolA} (${pctA}%) — final payout: **${payoutA}x**\n`;
             desc += `**${match.contestantB}**: ${poolB} (${pctB}%) — final payout: **${payoutB}x**\n`;
-            desc += `Total Pool: **${summary.totalPool}** YouCoins\n`;
+            desc += `Total Pool: **${summary.totalPool}** MugCoins\n`;
             if (summary.payouts.length > 0) {
                 desc += `\n**Top Payouts:**\n`;
                 const sorted = summary.payouts.sort((a, b) => b.payout - a.payout).slice(0, 5);
                 for (const p of sorted) {
-                    desc += `<@${p.userId}>: +${p.payout} YouCoins\n`;
+                    desc += `<@${p.userId}>: +${p.payout} MugCoins\n`;
                 }
                 if (summary.payouts.length > 5) {
                     desc += `*...and ${summary.payouts.length - 5} more winners*`;
@@ -320,7 +320,7 @@ async function handleSelectMatch(interaction) {
         return;
     }
     let desc = `**Match #${match.matchNumber}**: ${match.contestantA} vs ${match.contestantB}\n\n`;
-    desc += `Your balance: **${balance}** YouCoins\n\n`;
+    desc += `Your balance: **${balance}** MugCoins\n\n`;
     desc += `*Odds and pool sizes are hidden until the match is resolved.*`;
     const embed = new discord_js_1.EmbedBuilder()
         .setColor(0x00bfff)
@@ -383,15 +383,15 @@ async function handleBetSubmit(interaction) {
     const pickedContestant = pickLetter === 'a' ? match.contestantA : match.contestantB;
     const success = (0, db_1.placeBet)(activeTournament.id, matchId, interaction.user.id, interaction.guildId, pickedContestant, amount);
     if (!success) {
-        await interaction.reply({ content: 'Bet failed. You may not have enough YouCoins, or you already placed a bet on this match.', ephemeral: true });
+        await interaction.reply({ content: 'Bet failed. You may not have enough MugCoins, or you already placed a bet on this match.', ephemeral: true });
         return;
     }
     const balance = (0, db_1.getBalance)(interaction.user.id, interaction.guildId);
     let desc = `✅ **Bet Placed!**\n\n`;
     desc += `**Match #${match.matchNumber}**: ${match.contestantA} vs ${match.contestantB}\n`;
     desc += `Your pick: **${pickedContestant}**\n`;
-    desc += `Amount: **${amount}** YouCoins\n`;
-    desc += `Remaining balance: **${balance}** YouCoins\n\n`;
+    desc += `Amount: **${amount}** MugCoins\n`;
+    desc += `Remaining balance: **${balance}** MugCoins\n\n`;
     desc += `*Note: Final odds will be revealed when the match is resolved.*`;
     const embed = new discord_js_1.EmbedBuilder()
         .setColor(0x2ecc71)

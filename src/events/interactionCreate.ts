@@ -93,7 +93,7 @@ const commands: Record<string, (interaction: CommandInteraction) => Promise<void
     '/yousoro': async (interaction: CommandInteraction) => {
         await yousoroCommand.execute(interaction);
     },
-    '/youcoin': async (interaction: CommandInteraction) => {
+    '/mugcoin': async (interaction: CommandInteraction) => {
         await currencyCommand.execute(interaction);
     },
     '/tournament': async (interaction: CommandInteraction) => {
