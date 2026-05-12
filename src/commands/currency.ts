@@ -99,33 +99,33 @@ export const currencyCommand = {
         if (subcommand === 'balance') {
             const targetUser = options.getUser('user') || interaction.user;
             const balance = getBalance(targetUser.id, interaction.guild.id);
-            
+
             const embed = new EmbedBuilder()
                 .setColor(0x00bfff) // You Watanabe color
                 .setTitle(`${targetUser.username}'s Wallet`)
                 .setDescription(`**Balance:** ${balance} MugCoins`)
                 .setThumbnail(targetUser.displayAvatarURL());
-                
+
             await interaction.reply({ embeds: [embed] });
         } else if (subcommand === 'leaderboard') {
             const leaderboard = getLeaderboard(interaction.guild.id, 10);
-            
+
             if (leaderboard.length === 0) {
                 await interaction.reply('No users have MugCoins yet.');
                 return;
             }
-            
+
             let description = '';
             for (let i = 0; i < leaderboard.length; i++) {
                 const entry = leaderboard[i];
                 description += `**${i + 1}.** <@${entry.userId}> — ${entry.balance} MugCoins\n`;
             }
-            
+
             const embed = new EmbedBuilder()
                 .setColor(0x00bfff)
                 .setTitle('MugCoin Leaderboard')
                 .setDescription(description);
-                
+
             await interaction.reply({ embeds: [embed] });
         } else if (subcommand === 'pay') {
             const targetUser = options.getUser('user') as User;
@@ -152,7 +152,7 @@ export const currencyCommand = {
                 return;
             }
 
-            await interaction.reply(`💸 **${interaction.user.username}** has sent **${amount}** MugCoins to **${targetUser.username}**!`);
+            await interaction.reply(`**${interaction.user.username}** has sent **${amount}** MugCoins to **${targetUser.username}**!`);
         }
     }
 };
