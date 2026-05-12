@@ -39,6 +39,7 @@ export declare function getBalance(userId: string, guildId: string): number;
 export declare function addCurrency(userId: string, guildId: string, amount: number, reason: string, refId?: string | null): void;
 export declare function spendCurrency(userId: string, guildId: string, amount: number, reason: string, refId?: string | null): boolean;
 export declare function setBalance(userId: string, guildId: string, amount: number, reason: string): void;
+export declare function transferCurrency(senderId: string, receiverId: string, guildId: string, amount: number): boolean;
 export declare function getLeaderboard(guildId: string, limit: number): {
     userId: string;
     balance: number;

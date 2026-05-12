@@ -26,6 +26,7 @@ exports.getBalance = getBalance;
 exports.addCurrency = addCurrency;
 exports.spendCurrency = spendCurrency;
 exports.setBalance = setBalance;
+exports.transferCurrency = transferCurrency;
 exports.getLeaderboard = getLeaderboard;
 exports.createTournament = createTournament;
 exports.addTournamentMatch = addTournamentMatch;
@@ -474,6 +475,26 @@ function setBalance(userId, guildId, amount, reason) {
     db.run(`UPDATE wallets SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [amount, userId, guildId]);
     db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, balance_after) VALUES (?, ?, ?, ?, ?)`, [userId, guildId, diff, reason, amount]);
     saveDatabase();
+}
+function transferCurrency(senderId, receiverId, guildId, amount) {
+    if (!db || amount <= 0 || senderId === receiverId)
+        return false;
+    const senderWallet = getOrCreateWallet(senderId, guildId);
+    if (senderWallet.balance < amount)
+        return false;
+    const receiverWallet = getOrCreateWallet(receiverId, guildId);
+    const newSenderBalance = senderWallet.balance - amount;
+    const newSenderSpent = senderWallet.totalSpent + amount;
+    const newReceiverBalance = receiverWallet.balance + amount;
+    const newReceiverEarned = receiverWallet.totalEarned + amount;
+    // Update sender
+    db.run(`UPDATE wallets SET balance = ?, total_spent = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [newSenderBalance, newSenderSpent, senderId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, balance_after) VALUES (?, ?, ?, ?, ?)`, [senderId, guildId, -amount, 'user_transfer', newSenderBalance]);
+    // Update receiver
+    db.run(`UPDATE wallets SET balance = ?, total_earned = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [newReceiverBalance, newReceiverEarned, receiverId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, balance_after) VALUES (?, ?, ?, ?, ?)`, [receiverId, guildId, amount, 'user_transfer', newReceiverBalance]);
+    saveDatabase();
+    return true;
 }
 function getLeaderboard(guildId, limit) {
     if (!db)

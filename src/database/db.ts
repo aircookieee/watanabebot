@@ -494,6 +494,32 @@ export function setBalance(userId: string, guildId: string, amount: number, reas
     saveDatabase();
 }
 
+export function transferCurrency(senderId: string, receiverId: string, guildId: string, amount: number): boolean {
+    if (!db || amount <= 0 || senderId === receiverId) return false;
+
+    const senderWallet = getOrCreateWallet(senderId, guildId);
+    if (senderWallet.balance < amount) return false;
+
+    const receiverWallet = getOrCreateWallet(receiverId, guildId);
+
+    const newSenderBalance = senderWallet.balance - amount;
+    const newSenderSpent = senderWallet.totalSpent + amount;
+
+    const newReceiverBalance = receiverWallet.balance + amount;
+    const newReceiverEarned = receiverWallet.totalEarned + amount;
+
+    // Update sender
+    db.run(`UPDATE wallets SET balance = ?, total_spent = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [newSenderBalance, newSenderSpent, senderId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, balance_after) VALUES (?, ?, ?, ?, ?)`, [senderId, guildId, -amount, 'user_transfer', newSenderBalance]);
+
+    // Update receiver
+    db.run(`UPDATE wallets SET balance = ?, total_earned = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND guild_id = ?`, [newReceiverBalance, newReceiverEarned, receiverId, guildId]);
+    db.run(`INSERT INTO wallet_transactions (user_id, guild_id, amount, reason, balance_after) VALUES (?, ?, ?, ?, ?)`, [receiverId, guildId, amount, 'user_transfer', newReceiverBalance]);
+
+    saveDatabase();
+    return true;
+}
+
 export function getLeaderboard(guildId: string, limit: number): { userId: string; balance: number }[] {
     if (!db) return [];
 

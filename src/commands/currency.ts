@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, User } from 'discord.js';
-import { getBalance, getLeaderboard, setBalance, addCurrency, spendCurrency } from '../database/db';
+import { getBalance, getLeaderboard, setBalance, addCurrency, spendCurrency, transferCurrency } from '../database/db';
 import config from '../config/config';
 
 export const currencyCommand = {
@@ -14,6 +14,12 @@ export const currencyCommand = {
         .addSubcommand(sub =>
             sub.setName('leaderboard')
                 .setDescription('View the top 10 richest users')
+        )
+        .addSubcommand(sub =>
+            sub.setName('pay')
+                .setDescription('Pay YouCoins to another user')
+                .addUserOption(opt => opt.setName('user').setDescription('User to pay').setRequired(true))
+                .addIntegerOption(opt => opt.setName('amount').setDescription('Amount to pay').setRequired(true))
         )
         .addSubcommandGroup(group =>
             group.setName('admin')
@@ -121,6 +127,32 @@ export const currencyCommand = {
                 .setDescription(description);
                 
             await interaction.reply({ embeds: [embed] });
+        } else if (subcommand === 'pay') {
+            const targetUser = options.getUser('user') as User;
+            const amount = options.getInteger('amount') as number;
+
+            if (targetUser.id === interaction.user.id) {
+                await interaction.reply({ content: 'You cannot send YouCoins to yourself.', ephemeral: true });
+                return;
+            }
+
+            if (amount <= 0) {
+                await interaction.reply({ content: 'Amount must be greater than 0.', ephemeral: true });
+                return;
+            }
+
+            if (targetUser.bot) {
+                await interaction.reply({ content: 'You cannot send YouCoins to bots.', ephemeral: true });
+                return;
+            }
+
+            const success = transferCurrency(interaction.user.id, targetUser.id, interaction.guild.id, amount);
+            if (!success) {
+                await interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
+                return;
+            }
+
+            await interaction.reply(`💸 **${interaction.user.username}** has sent **${amount}** YouCoins to **${targetUser.username}**!`);
         }
     }
 };
