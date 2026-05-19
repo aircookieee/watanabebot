@@ -129,6 +129,46 @@ async function sendTournamentUpdate(client: Client, content: string) {
     }
 }
 
+async function resolveUsername(client: Client, userId: string | null | undefined): Promise<string | null> {
+    if (!userId) return null;
+    try {
+        if (config.discord.guildId) {
+            const guild = await client.guilds.fetch(config.discord.guildId);
+            const member = await guild.members.fetch(userId);
+            return member.displayName || member.user.username || userId;
+        }
+    } catch {}
+
+    try {
+        const user = await client.users.fetch(userId);
+        return user.username || userId;
+    } catch {
+        return userId;
+    }
+}
+
+async function withTransactionUsernames(client: Client, transactions: ReturnType<typeof getWalletTransactions>) {
+    return Promise.all(transactions.map(async tx => ({
+        ...tx,
+        username: await resolveUsername(client, tx.userId),
+    })));
+}
+
+async function withLeaderboardUsernames(client: Client, leaderboard: ReturnType<typeof getWalletLeaderboard>) {
+    return Promise.all(leaderboard.map(async row => ({
+        ...row,
+        username: await resolveUsername(client, row.userId),
+    })));
+}
+
+async function withAuditUsernames(client: Client, logs: ReturnType<typeof getAuditLogs>) {
+    return Promise.all(logs.map(async log => ({
+        ...log,
+        actorUsername: await resolveUsername(client, log.actorUserId),
+        targetUsername: log.targetType === 'wallet' ? await resolveUsername(client, log.targetId) : null,
+    })));
+}
+
 function assetPath(...segments: string[]) {
     return path.resolve(__dirname, '../../dist-web', ...segments);
 }
@@ -226,7 +266,13 @@ export async function startWebServer(client: Client): Promise<void> {
         }
 
         if (url.pathname === '/api/me' && method === 'GET') {
-            return json(res, 200, { userId: session!.userId, username: session!.username, role: getUserRole(session!.userId), csrfToken: session!.csrfToken });
+            return json(res, 200, {
+                userId: session!.userId,
+                username: session!.username,
+                role: getUserRole(session!.userId),
+                balance: getWalletSummary(session!.userId, config.currency.guildId).balance,
+                csrfToken: session!.csrfToken,
+            });
         }
 
         if (url.pathname === '/api/tournament' && method === 'GET') {
@@ -253,7 +299,7 @@ export async function startWebServer(client: Client): Promise<void> {
             const pageSize = 25;
             const transactions = getWalletTransactions(config.currency.guildId, session!.userId, 500);
             const start = (page - 1) * pageSize;
-            return json(res, 200, { summary: getWalletSummary(session!.userId, config.currency.guildId), transactions: transactions.slice(start, start + pageSize), page, hasMore: start + pageSize < transactions.length });
+            return json(res, 200, { summary: getWalletSummary(session!.userId, config.currency.guildId), transactions: await withTransactionUsernames(client, transactions.slice(start, start + pageSize)), page, hasMore: start + pageSize < transactions.length });
         }
 
         if (url.pathname === '/api/wallet/pay' && method === 'POST') {
@@ -267,7 +313,7 @@ export async function startWebServer(client: Client): Promise<void> {
         }
 
         if (url.pathname === '/api/leaderboard' && method === 'GET') {
-            return json(res, 200, { leaderboard: getWalletLeaderboard(config.currency.guildId, Number(url.searchParams.get('limit') || '10') || 10) });
+            return json(res, 200, { leaderboard: await withLeaderboardUsernames(client, getWalletLeaderboard(config.currency.guildId, Number(url.searchParams.get('limit') || '10') || 10)) });
         }
 
         if (url.pathname === '/api/operator/history' && method === 'GET') {
@@ -278,7 +324,7 @@ export async function startWebServer(client: Client): Promise<void> {
             const pageSize = 25;
             const logs = getAuditLogs(250).filter(log => (!action || log.action.includes(action)) && (!targetType || log.targetType.includes(targetType)));
             const start = (page - 1) * pageSize;
-            return json(res, 200, { entries: logs.slice(start, start + pageSize), page, hasMore: start + pageSize < logs.length });
+            return json(res, 200, { entries: await withAuditUsernames(client, logs.slice(start, start + pageSize)), page, hasMore: start + pageSize < logs.length });
         }
 
         if (url.pathname === '/api/admin/transactions' && method === 'GET') {
@@ -288,7 +334,7 @@ export async function startWebServer(client: Client): Promise<void> {
             const pageSize = 25;
             const txs = getWalletTransactions(config.currency.guildId, userId, 500);
             const start = (page - 1) * pageSize;
-            return json(res, 200, { transactions: txs.slice(start, start + pageSize), page, hasMore: start + pageSize < txs.length });
+            return json(res, 200, { transactions: await withTransactionUsernames(client, txs.slice(start, start + pageSize)), page, hasMore: start + pageSize < txs.length });
         }
 
         if (url.pathname === '/api/operator/bracket-sorter' && method === 'POST') {

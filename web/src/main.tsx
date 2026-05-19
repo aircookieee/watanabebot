@@ -4,12 +4,12 @@ import { Link, NavLink, Navigate, Route, BrowserRouter as Router, Routes, useLoc
 import './styles.css';
 
 type Role = 'user' | 'operator' | 'admin';
-type Me = { userId: string; username: string; role: Role; csrfToken: string };
+type Me = { userId: string; username: string; role: Role; balance: number; csrfToken: string };
 type Match = { id: number; matchNumber: number; roundNumber: number; contestantA: string; contestantB: string; winner: string | null; bettingOpen: boolean; userBet?: { picked: string; amount: number; status: string; payout: number } | null };
 type Tournament = { tournament: { id: number; name: string } | null; role: Role; walletBalance: number; currentRoundNumber: number | null; matches: Match[] };
 type Bet = { matchId: number; matchNumber: number; picked: string; amount: number; status: string; payout: number; contestantA: string; contestantB: string; winner: string | null };
-type Tx = { id: number; userId: string; amount: number; reason: string; referenceId: string | null; balanceAfter: number; createdAt: string };
-type Audit = { id: number; actorUserId: string; action: string; targetType: string; targetId: string | null; metadata: string | null; createdAt: string };
+type Tx = { id: number; userId: string; username?: string | null; amount: number; reason: string; referenceId: string | null; balanceAfter: number; createdAt: string };
+type Audit = { id: number; actorUserId: string; actorUsername?: string | null; action: string; targetType: string; targetId: string | null; targetUsername?: string | null; metadata: string | null; createdAt: string };
 type BracketPreview = { entries: { seed: number; name: string; originalNumber: number }[]; matches: { a: string; b: string }[] };
 
 const currency = new Intl.NumberFormat('en-US');
@@ -68,6 +68,7 @@ function Login() {
 
 function Shell({ me }: { me: Me }) {
   const location = useLocation();
+  const [balance, setBalance] = useState(me.balance);
   const nav = [
     ['Dashboard', '/dashboard'],
     ['Tournament', '/tournament'],
@@ -77,6 +78,14 @@ function Shell({ me }: { me: Me }) {
     ...(me.role !== 'user' ? [['Operator', '/operator'], ['Bracket Sorter', '/operator/bracket-sorter'], ['History', '/operator/history']] : []),
     ...(me.role === 'admin' ? [['Admin', '/admin'], ['Transactions', '/admin/transactions']] : []),
   ];
+  useEffect(() => {
+    setBalance(me.balance);
+    const timer = window.setInterval(() => {
+      api<Me>('/api/me').then(data => setBalance(data.balance)).catch(() => {});
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [me.balance]);
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -85,7 +94,11 @@ function Shell({ me }: { me: Me }) {
       </aside>
       <div className="main">
         <header className="topbar">
-          <div><strong>{me.username}</strong><span>{me.role}</span></div>
+          <div className="mugcoinCounter" aria-label="MugCoin balance">
+            <span>MugCoin</span>
+            <strong>{currency.format(balance)}</strong>
+          </div>
+          <div className="accountBlock"><strong>{me.username}</strong><span>{me.role}</span></div>
           <form method="post" action="/auth/logout"><button className="ghost">Logout</button></form>
         </header>
         <Routes>
@@ -200,8 +213,8 @@ function Wallet({ me }: { me: Me }) {
 }
 
 function Leaderboard() {
-  const state = useLoad(() => api<{ leaderboard: { userId: string; balance: number }[] }>('/api/leaderboard?limit=25'), []);
-  return <Page title="Leaderboard" subtitle="Top wallet balances."><DataTable rows={(state.data?.leaderboard || []).map((x, i) => ({ rank: i + 1, ...x }))} columns={['rank', 'userId', 'balance']} /></Page>;
+  const state = useLoad(() => api<{ leaderboard: { userId: string; username?: string | null; balance: number }[] }>('/api/leaderboard?limit=25'), []);
+  return <Page title="Leaderboard" subtitle="Top wallet balances."><DataTable rows={(state.data?.leaderboard || []).map((x, i) => ({ rank: i + 1, ...x, user: x.username || x.userId }))} columns={['rank', 'user', 'balance']} /></Page>;
 }
 
 function Operator({ me }: { me: Me }) {
@@ -251,7 +264,8 @@ function OperatorHistory() {
   const [filters, setFilters] = useState({ action: '', targetType: '' });
   const query = new URLSearchParams({ page: String(page), ...filters }).toString();
   const state = useLoad(() => api<{ entries: Audit[]; hasMore: boolean }>(`/api/operator/history?${query}`), [page, filters.action, filters.targetType]);
-  return <Page title="Operator History" subtitle="Filterable audit log."><Filters filters={filters} setFilters={setFilters} /><DataTable rows={state.data?.entries || []} columns={['id', 'action', 'targetType', 'targetId', 'actorUserId', 'createdAt']} /><Pager page={page} hasMore={!!state.data?.hasMore} setPage={setPage} /></Page>;
+  const rows = (state.data?.entries || []).map(entry => ({ ...entry, actor: entry.actorUsername || entry.actorUserId, target: entry.targetUsername || entry.targetId }));
+  return <Page title="Operator History" subtitle="Filterable audit log."><Filters filters={filters} setFilters={setFilters} /><DataTable rows={rows} columns={['id', 'action', 'targetType', 'target', 'actor', 'createdAt']} /><Pager page={page} hasMore={!!state.data?.hasMore} setPage={setPage} /></Page>;
 }
 
 function Admin({ me }: { me: Me }) {
@@ -263,14 +277,16 @@ function Admin({ me }: { me: Me }) {
 
 function RecentAudit() {
   const state = useLoad(() => api<{ entries: Audit[] }>('/api/operator/history'), []);
-  return <Section title="Recent audit activity"><DataTable rows={state.data?.entries.slice(0, 10) || []} columns={['id', 'action', 'targetType', 'targetId', 'actorUserId', 'createdAt']} /></Section>;
+  const rows = (state.data?.entries.slice(0, 10) || []).map(entry => ({ ...entry, actor: entry.actorUsername || entry.actorUserId, target: entry.targetUsername || entry.targetId }));
+  return <Section title="Recent audit activity"><DataTable rows={rows} columns={['id', 'action', 'targetType', 'target', 'actor', 'createdAt']} /></Section>;
 }
 
 function AdminTransactions() {
   const [page, setPage] = useState(1);
   const [userId, setUserId] = useState('');
   const state = useLoad(() => api<{ transactions: Tx[]; hasMore: boolean }>(`/api/admin/transactions?page=${page}&userId=${encodeURIComponent(userId)}`), [page, userId]);
-  return <Page title="Admin Transactions" subtitle="Filter wallet movement by user."><div className="filters"><input placeholder="User ID" value={userId} onChange={e => setUserId(e.target.value)} /></div><DataTable rows={state.data?.transactions || []} columns={['id', 'userId', 'amount', 'reason', 'referenceId', 'balanceAfter', 'createdAt']} /><Pager page={page} hasMore={!!state.data?.hasMore} setPage={setPage} /></Page>;
+  const rows = (state.data?.transactions || []).map(tx => ({ ...tx, user: tx.username || tx.userId }));
+  return <Page title="Admin Transactions" subtitle="Filter wallet movement by user."><div className="filters"><input placeholder="User ID" value={userId} onChange={e => setUserId(e.target.value)} /></div><DataTable rows={rows} columns={['id', 'user', 'amount', 'reason', 'referenceId', 'balanceAfter', 'createdAt']} /><Pager page={page} hasMore={!!state.data?.hasMore} setPage={setPage} /></Page>;
 }
 
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) { return <main className="page"><div className="pageTitle"><div><h1>{title}</h1><p>{subtitle}</p></div></div>{children}</main>; }

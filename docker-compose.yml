@@ -7,7 +7,4 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - watanabe-data:/app/data
-
-volumes:
-  watanabe-data:
+      - ./data:/app/data

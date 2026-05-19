@@ -58,14 +58,39 @@ h1, h2, h3, p { margin-top: 0; }
   height: 64px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 16px;
   padding: 0 24px;
   background: #fff;
   border-bottom: 1px solid #dbe3ec;
 }
-.topbar div { display: grid; text-align: right; line-height: 1.25; }
-.topbar span { color: #6b7888; font-size: 13px; text-transform: capitalize; }
+.accountBlock { display: grid; text-align: right; line-height: 1.25; }
+.accountBlock strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.accountBlock span { color: #6b7888; font-size: 13px; text-transform: capitalize; }
+.topbar form { flex: 0 0 auto; }
+.mugcoinCounter {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: auto;
+  color: #152033;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.mugcoinCounter span {
+  color: #6b7888;
+  font-size: 13px;
+  font-weight: 750;
+}
+.mugcoinCounter strong {
+  border-radius: 999px;
+  background: #fff7d6;
+  border: 1px solid #f2d46b;
+  color: #654b00;
+  padding: 6px 10px;
+  min-width: 52px;
+  text-align: center;
+}
 .page { padding: 24px; max-width: 1440px; margin: 0 auto; width: 100%; }
 .pageTitle { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .pageTitle h1 { font-size: 28px; margin-bottom: 4px; letter-spacing: 0; }
@@ -132,7 +157,7 @@ h1, h2, h3, p { margin-top: 0; }
   .sidebar { position: static; height: auto; }
   .sidebar nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar { justify-content: space-between; padding: 0 16px; }
-  .topbar div { text-align: left; }
+  .accountBlock { text-align: left; }
   .page { padding: 16px; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .split, .twoCol { grid-template-columns: 1fr; }
@@ -141,6 +166,9 @@ h1, h2, h3, p { margin-top: 0; }
 @media (max-width: 560px) {
   .stats, .matchGrid, .matchGrid.compact, .matchGrid.operatorGrid { grid-template-columns: 1fr; }
   .sidebar nav { grid-template-columns: 1fr; }
+  .topbar { gap: 10px; }
+  .mugcoinCounter span { display: none; }
+  .accountBlock strong { max-width: 90px; }
   .formRow input, .formRow select, .formRow button, .inlineForm button { width: 100%; flex-basis: 100%; }
   .pageTitle h1 { font-size: 24px; }
 }

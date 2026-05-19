@@ -14,13 +14,15 @@ const nitterLinkNew = /(https:\/\/nitter\.net\/(\w+)(\/(\w+)\/(\w+))?)/gi;
 const commandSearch = /^!yousoro(?:$| (.+))/;
 const animeBracketSearch = /\(\(+.+?\)\)/gm;
 const mangaBracketSearch = /\[\[+.+?\]\]/gm;
+const messageRewardCooldownMs = 60 * 1000;
+const lastMessageRewardAt = new Map<string, number>();
 
 export const name = Events.MessageCreate;
 
 export async function execute(message: Message): Promise<void> {
     if (message.author.bot && !message.webhookId) return;
 
-    if (!message.author.bot && message.guild?.id === config.currency.guildId) {
+    if (!message.author.bot && message.guild?.id === config.currency.guildId && shouldRewardMessage(message.author.id, message.guild.id)) {
         addCurrency(message.author.id, message.guild.id, 1, 'message');
     }
 
@@ -233,6 +235,19 @@ export async function execute(message: Message): Promise<void> {
     if (message.webhookId === config.channels.musicartWebhookId) {
         await translateWebhookMessage(channel, message);
     }
+}
+
+function shouldRewardMessage(userId: string, guildId: string): boolean {
+    const rewardKey = `${guildId}:${userId}`;
+    const now = Date.now();
+    const lastRewardAt = lastMessageRewardAt.get(rewardKey);
+
+    if (lastRewardAt !== undefined && now - lastRewardAt < messageRewardCooldownMs) {
+        return false;
+    }
+
+    lastMessageRewardAt.set(rewardKey, now);
+    return true;
 }
 
 async function fixTwitterEmbeds(channel: TextChannel | DMChannel, message: Message): Promise<void> {

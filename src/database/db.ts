@@ -5,6 +5,17 @@ import config from '../config/config';
 
 let db: SqlJsDatabase | null = null;
 let dbPath: string = '';
+let protectedTableCounts: Record<string, number> | null = null;
+let startupBackupCreated = false;
+
+const PROTECTED_TABLES = [
+    'wallets',
+    'wallet_transactions',
+    'tournaments',
+    'tournament_rounds',
+    'tournament_matches',
+    'bets',
+] as const;
 
 export async function initDatabase(): Promise<void> {
     const wasmPath = path.join(__dirname, '../../node_modules/sql.js/dist/sql-wasm.wasm');
@@ -24,7 +35,17 @@ export async function initDatabase(): Promise<void> {
         fs.mkdirSync(dataDir, { recursive: true });
     }
 
-    if (fs.existsSync(dbPath)) {
+    const dbFileExisted = fs.existsSync(dbPath);
+
+    if (!dbFileExisted && process.env.NODE_ENV === 'production' && process.env.ALLOW_DATABASE_BOOTSTRAP !== 'true') {
+        throw new Error(
+            `Refusing to create a new production database at ${dbPath}. ` +
+            'This prevents wallet, bet, and tournament resets when the Docker data volume is missing or empty. ' +
+            'Restore/mount the existing database, or set ALLOW_DATABASE_BOOTSTRAP=true only for an intentional first boot.'
+        );
+    }
+
+    if (dbFileExisted) {
         const fileBuffer = fs.readFileSync(dbPath);
         db = new SQL.Database(fileBuffer);
     } else {
@@ -32,15 +53,60 @@ export async function initDatabase(): Promise<void> {
     }
 
     initializeTables();
-    migrateLegacyData();
+    migrateLegacyData(dbFileExisted);
+    protectedTableCounts = getProtectedTableCounts();
     saveDatabase();
 }
 
 function saveDatabase(): void {
     if (!db) return;
+    assertProtectedTablesWereNotReset();
+    createStartupBackup();
     const data = db.export();
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbPath, buffer);
+    protectedTableCounts = getProtectedTableCounts();
+}
+
+function getTableCount(tableName: string): number {
+    if (!db) return 0;
+    try {
+        const result = db.exec(`SELECT COUNT(*) FROM ${tableName}`);
+        return (result[0]?.values[0]?.[0] as number) || 0;
+    } catch {
+        return 0;
+    }
+}
+
+function getProtectedTableCounts(): Record<string, number> {
+    return Object.fromEntries(PROTECTED_TABLES.map(table => [table, getTableCount(table)]));
+}
+
+function assertProtectedTablesWereNotReset(): void {
+    if (!protectedTableCounts) return;
+
+    const currentCounts = getProtectedTableCounts();
+    const losses = PROTECTED_TABLES
+        .map(table => ({ table, before: protectedTableCounts![table], after: currentCounts[table] }))
+        .filter(item => item.after < item.before);
+
+    if (losses.length === 0) return;
+
+    const summary = losses.map(item => `${item.table}: ${item.before} -> ${item.after}`).join(', ');
+    throw new Error(`Refusing to save database because protected data would decrease (${summary}).`);
+}
+
+function createStartupBackup(): void {
+    if (startupBackupCreated || !dbPath || !fs.existsSync(dbPath)) return;
+
+    const backupDir = path.join(path.dirname(dbPath), 'backups');
+    fs.mkdirSync(backupDir, { recursive: true });
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(backupDir, `watanabebot.${stamp}.db`);
+    fs.copyFileSync(dbPath, backupPath);
+    startupBackupCreated = true;
+    console.log(`Created database startup backup: ${backupPath}`);
 }
 
 function initializeTables(): void {
@@ -205,34 +271,53 @@ function initializeTables(): void {
     `);
 }
 
-function migrateLegacyData(): void {
+function findLegacyMapPath(): string | null {
+    const candidates = [
+        process.env.LEGACY_ANILIST_MAP_PATH,
+        path.resolve(process.cwd(), 'discordAniListMap.json'),
+        path.join(__dirname, '../../discordAniListMap.json'),
+    ].filter((candidate): candidate is string => !!candidate);
+
+    for (const candidate of [...new Set(candidates)]) {
+        if (fs.existsSync(candidate)) return candidate;
+    }
+
+    console.log('No legacy mapping file found. Checked:', [...new Set(candidates)].join(', '));
+    return null;
+}
+
+function migrateLegacyData(dbFileExisted: boolean): void {
     if (!db) return;
 
-    const legacyMapPath = path.join(__dirname, '../../discordAniListMap.json');
-    console.log('Checking for legacy data at:', legacyMapPath);
+    const legacyMapPath = findLegacyMapPath();
     
-    if (fs.existsSync(legacyMapPath)) {
+    if (legacyMapPath) {
         try {
             const legacyMap = JSON.parse(fs.readFileSync(legacyMapPath, 'utf-8'));
-            console.log('Found legacy mappings:', JSON.stringify(legacyMap));
 
             const stmt = db.prepare(`
                 INSERT OR IGNORE INTO discord_anilist_map (discord_id, anilist_username)
                 VALUES (?, ?)
             `);
 
+            let migratedCount = 0;
             for (const [discordId, anilistUsername] of Object.entries(legacyMap)) {
+                if (typeof anilistUsername !== 'string') continue;
                 stmt.run([discordId, anilistUsername] as any);
+                migratedCount++;
             }
             stmt.free();
 
             saveDatabase();
-            console.log('Migrated legacy Anilist mapping data');
+            console.log(`Migrated ${migratedCount} legacy Anilist mappings from ${legacyMapPath}`);
         } catch (err) {
             console.error('Failed to migrate legacy data:', err);
         }
-    } else {
-        console.log('No legacy mapping file found');
+        return;
+    }
+
+    if (!dbFileExisted && getAnilistUserCount() === 0) {
+        console.warn('Started with a new database and no legacy AniList mapping file; discord_anilist_map is empty.');
     }
 }
 

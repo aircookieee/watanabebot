@@ -53,11 +53,13 @@ const nitterLinkNew = /(https:\/\/nitter\.net\/(\w+)(\/(\w+)\/(\w+))?)/gi;
 const commandSearch = /^!yousoro(?:$| (.+))/;
 const animeBracketSearch = /\(\(+.+?\)\)/gm;
 const mangaBracketSearch = /\[\[+.+?\]\]/gm;
+const messageRewardCooldownMs = 60 * 1000;
+const lastMessageRewardAt = new Map();
 exports.name = discord_js_1.Events.MessageCreate;
 async function execute(message) {
     if (message.author.bot && !message.webhookId)
         return;
-    if (!message.author.bot && message.guild?.id === config_1.default.currency.guildId) {
+    if (!message.author.bot && message.guild?.id === config_1.default.currency.guildId && shouldRewardMessage(message.author.id, message.guild.id)) {
         (0, db_1.addCurrency)(message.author.id, message.guild.id, 1, 'message');
     }
     const channel = message.channel;
@@ -257,6 +259,16 @@ async function execute(message) {
     if (message.webhookId === config_1.default.channels.musicartWebhookId) {
         await translateWebhookMessage(channel, message);
     }
+}
+function shouldRewardMessage(userId, guildId) {
+    const rewardKey = `${guildId}:${userId}`;
+    const now = Date.now();
+    const lastRewardAt = lastMessageRewardAt.get(rewardKey);
+    if (lastRewardAt !== undefined && now - lastRewardAt < messageRewardCooldownMs) {
+        return false;
+    }
+    lastMessageRewardAt.set(rewardKey, now);
+    return true;
 }
 async function fixTwitterEmbeds(channel, message) {
     if (message.webhookId && (!message.author || message.author.id !== config_1.default.pluralKitUid))

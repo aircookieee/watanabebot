@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm ci
 
 COPY tsconfig.json ./
+COPY discordAniListMap.json ./
 COPY web ./web
 COPY src ./src
 COPY resources ./resources

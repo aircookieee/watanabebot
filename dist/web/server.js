@@ -124,6 +124,44 @@ async function sendTournamentUpdate(client, content) {
         console.error('Failed to send tournament update:', error);
     }
 }
+async function resolveUsername(client, userId) {
+    if (!userId)
+        return null;
+    try {
+        if (config_1.default.discord.guildId) {
+            const guild = await client.guilds.fetch(config_1.default.discord.guildId);
+            const member = await guild.members.fetch(userId);
+            return member.displayName || member.user.username || userId;
+        }
+    }
+    catch { }
+    try {
+        const user = await client.users.fetch(userId);
+        return user.username || userId;
+    }
+    catch {
+        return userId;
+    }
+}
+async function withTransactionUsernames(client, transactions) {
+    return Promise.all(transactions.map(async (tx) => ({
+        ...tx,
+        username: await resolveUsername(client, tx.userId),
+    })));
+}
+async function withLeaderboardUsernames(client, leaderboard) {
+    return Promise.all(leaderboard.map(async (row) => ({
+        ...row,
+        username: await resolveUsername(client, row.userId),
+    })));
+}
+async function withAuditUsernames(client, logs) {
+    return Promise.all(logs.map(async (log) => ({
+        ...log,
+        actorUsername: await resolveUsername(client, log.actorUserId),
+        targetUsername: log.targetType === 'wallet' ? await resolveUsername(client, log.targetId) : null,
+    })));
+}
 function assetPath(...segments) {
     return path_1.default.resolve(__dirname, '../../dist-web', ...segments);
 }
@@ -215,7 +253,13 @@ async function startWebServer(client) {
                 return apiError(res, 401, 'unauthorized');
         }
         if (url.pathname === '/api/me' && method === 'GET') {
-            return json(res, 200, { userId: session.userId, username: session.username, role: (0, authz_1.getUserRole)(session.userId), csrfToken: session.csrfToken });
+            return json(res, 200, {
+                userId: session.userId,
+                username: session.username,
+                role: (0, authz_1.getUserRole)(session.userId),
+                balance: (0, wallets_1.getWalletSummary)(session.userId, config_1.default.currency.guildId).balance,
+                csrfToken: session.csrfToken,
+            });
         }
         if (url.pathname === '/api/tournament' && method === 'GET') {
             return json(res, 200, (0, tournaments_1.getTournamentOverview)(config_1.default.currency.guildId, session.userId));
@@ -239,7 +283,7 @@ async function startWebServer(client) {
             const pageSize = 25;
             const transactions = (0, db_1.getWalletTransactions)(config_1.default.currency.guildId, session.userId, 500);
             const start = (page - 1) * pageSize;
-            return json(res, 200, { summary: (0, wallets_1.getWalletSummary)(session.userId, config_1.default.currency.guildId), transactions: transactions.slice(start, start + pageSize), page, hasMore: start + pageSize < transactions.length });
+            return json(res, 200, { summary: (0, wallets_1.getWalletSummary)(session.userId, config_1.default.currency.guildId), transactions: await withTransactionUsernames(client, transactions.slice(start, start + pageSize)), page, hasMore: start + pageSize < transactions.length });
         }
         if (url.pathname === '/api/wallet/pay' && method === 'POST') {
             try {
@@ -252,7 +296,7 @@ async function startWebServer(client) {
             }
         }
         if (url.pathname === '/api/leaderboard' && method === 'GET') {
-            return json(res, 200, { leaderboard: (0, wallets_1.getWalletLeaderboard)(config_1.default.currency.guildId, Number(url.searchParams.get('limit') || '10') || 10) });
+            return json(res, 200, { leaderboard: await withLeaderboardUsernames(client, (0, wallets_1.getWalletLeaderboard)(config_1.default.currency.guildId, Number(url.searchParams.get('limit') || '10') || 10)) });
         }
         if (url.pathname === '/api/operator/history' && method === 'GET') {
             if (!session || !(0, authz_1.canManageTournaments)(session.userId))
@@ -263,7 +307,7 @@ async function startWebServer(client) {
             const pageSize = 25;
             const logs = (0, db_1.getAuditLogs)(250).filter(log => (!action || log.action.includes(action)) && (!targetType || log.targetType.includes(targetType)));
             const start = (page - 1) * pageSize;
-            return json(res, 200, { entries: logs.slice(start, start + pageSize), page, hasMore: start + pageSize < logs.length });
+            return json(res, 200, { entries: await withAuditUsernames(client, logs.slice(start, start + pageSize)), page, hasMore: start + pageSize < logs.length });
         }
         if (url.pathname === '/api/admin/transactions' && method === 'GET') {
             if (!session || !(0, authz_1.canUseAdminTools)(session.userId))
@@ -273,7 +317,7 @@ async function startWebServer(client) {
             const pageSize = 25;
             const txs = (0, db_1.getWalletTransactions)(config_1.default.currency.guildId, userId, 500);
             const start = (page - 1) * pageSize;
-            return json(res, 200, { transactions: txs.slice(start, start + pageSize), page, hasMore: start + pageSize < txs.length });
+            return json(res, 200, { transactions: await withTransactionUsernames(client, txs.slice(start, start + pageSize)), page, hasMore: start + pageSize < txs.length });
         }
         if (url.pathname === '/api/operator/bracket-sorter' && method === 'POST') {
             if (!session || !(0, authz_1.canManageTournaments)(session.userId))
