@@ -44,15 +44,48 @@ export declare function getLeaderboard(guildId: string, limit: number): {
     userId: string;
     balance: number;
 }[];
+export declare function getWalletTransactions(guildId: string, userId?: string, limit?: number): {
+    id: number;
+    userId: string;
+    amount: number;
+    reason: string;
+    referenceId: string | null;
+    balanceAfter: number;
+    createdAt: string;
+}[];
+export declare function addAuditLog(actorUserId: string, action: string, targetType: string, targetId?: string | null, metadata?: Record<string, unknown>): void;
+export declare function getAuditLogs(limit?: number): {
+    id: number;
+    actorUserId: string;
+    action: string;
+    targetType: string;
+    targetId: string | null;
+    metadata: string | null;
+    createdAt: string;
+}[];
+export declare function saveWebSession(sid: string, userId: string, username: string, guildMember: boolean, csrfToken: string, bracketPreview?: string | null): void;
+export declare function getWebSession(sid: string): {
+    userId: string;
+    username: string;
+    guildMember: boolean;
+    csrfToken: string;
+    bracketPreview: string | null;
+} | null;
+export declare function deleteWebSession(sid: string): void;
 export declare function createTournament(guildId: string, name: string): number | null;
-export declare function addTournamentMatch(tournamentId: number, matchNum: number, contestantA: string, contestantB: string): void;
+export declare function addTournamentMatch(tournamentId: number, matchNum: number, contestantA: string, contestantB: string, roundNumber?: number): void;
 export declare function getActiveTournament(guildId: string): {
     id: number;
     name: string;
 } | null;
-export declare function getTournamentMatches(tournamentId: number): any[];
+export declare function getTournamentMatches(tournamentId: number, roundNumber?: number): any[];
 export declare function getMatch(matchId: number): any | null;
 export declare function getMatchByNumber(tournamentId: number, matchNumber: number): any | null;
+export declare function getCurrentRoundNumber(tournamentId: number): number;
+export declare function createNextRoundFromWinners(tournamentId: number): {
+    roundNumber: number;
+    matchCount: number;
+};
 export declare function closeBettingForMatch(matchId: number): void;
 export declare function placeBet(tournamentId: number, matchId: number, userId: string, guildId: string, picked: string, amount: number): boolean;
 export declare function getBetsForMatch(tournamentId: number, matchId: number): any[];

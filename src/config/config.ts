@@ -8,6 +8,8 @@ export const config = {
         token: process.env.DISCORD_TOKEN || '',
         clientId: process.env.DISCORD_CLIENT_ID || '',
         guildId: process.env.DISCORD_GUILD_ID || '',
+        oauthClientSecret: process.env.DISCORD_OAUTH_CLIENT_SECRET || '',
+        oauthRedirectUri: process.env.DISCORD_OAUTH_REDIRECT_URI || '',
     },
     anilist: {
         apiUrl: 'https://graphql.anilist.co',
@@ -27,6 +29,7 @@ export const config = {
         musicartWebhookId: process.env.CHANNEL_MUSICART_WEBHOOK_ID || '',
         loveLiveMusicChannelId: process.env.CHANNEL_LOVELIVE_MUSIC_ID || '',
         dailyFactsChannelId: process.env.CHANNEL_DAILY_FACTS_ID || '',
+        tournamentUpdatesChannelId: process.env.CHANNEL_TOURNAMENT_UPDATES_ID || '',
     },
     paths: {
         dataDir: path.resolve(__dirname, '../../data'),
@@ -47,6 +50,12 @@ export const config = {
     },
     tournament: {
         operatorId: process.env.TOURNAMENT_OPERATOR_ID || '',
+    },
+    web: {
+        port: parseInt(process.env.WEB_PORT || '3000', 10),
+        baseUrl: process.env.WEB_BASE_URL || 'http://localhost:3000',
+        sessionSecret: process.env.SESSION_SECRET || 'dev-session-secret',
+        faviconPath: process.env.WEB_FAVICON_PATH || path.resolve(__dirname, '../../resources/yousoro2.png'),
     },
 };
 

@@ -1,7 +1,13 @@
 import { SlashCommandBuilder, CommandInteraction, EmbedBuilder, Attachment, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuInteraction, ButtonInteraction, ModalSubmitInteraction } from 'discord.js';
-import { createTournament, addTournamentMatch, getActiveTournament, getTournamentMatches, getMatch, getMatchByNumber, closeBettingForMatch, getBetsForMatch, getUserBets, resolveMatch, endTournament, getBalance, spendCurrency, placeBet } from '../database/db';
+import { getActiveTournament, getTournamentMatches, getMatch, getMatchByNumber, getBetsForMatch, getUserBets, getBalance } from '../database/db';
 import config from '../config/config';
 import axios from 'axios';
+import { openTournamentFromBracket, closeAllTournamentMatches, closeTournamentMatch, completeTournament, resolveTournamentMatch, placeTournamentBet, advanceTournamentRound } from '../services/tournaments';
+import { canManageTournaments } from '../services/authz';
+
+function formatMatchLabel(match: { roundNumber?: number; matchNumber: number; contestantA: string; contestantB: string }) {
+    return `Round ${match.roundNumber ?? 1}, Match ${match.matchNumber}: ${match.contestantA} vs ${match.contestantB}`;
+}
 
 export const tournamentCommand = {
     data: new SlashCommandBuilder()
@@ -40,6 +46,10 @@ export const tournamentCommand = {
         .addSubcommand(sub =>
             sub.setName('end')
                 .setDescription('End the current tournament')
+        )
+        .addSubcommand(sub =>
+            sub.setName('advance')
+                .setDescription('Advance to the next round after all current matches are resolved')
         ),
     execute: async (interaction: CommandInteraction) => {
         if (!interaction.guild) {
@@ -55,9 +65,9 @@ export const tournamentCommand = {
         const options = (interaction as any).options;
         const subcommand = options.getSubcommand();
 
-        // Operator commands
-        if (['open', 'resolve', 'end', 'close'].includes(subcommand)) {
-            if (interaction.user.id !== config.tournament.operatorId) {
+        // Tournament manager commands
+        if (['open', 'resolve', 'end', 'close', 'advance'].includes(subcommand)) {
+            if (!canManageTournaments(interaction.user.id)) {
                 await interaction.reply({ content: 'You do not have permission to manage tournaments.', ephemeral: true });
                 return;
             }
@@ -99,14 +109,7 @@ export const tournamentCommand = {
                     }
                 }
 
-                const tournamentId = createTournament(interaction.guild.id, name);
-                if (!tournamentId) throw new Error('Database error creating tournament.');
-
-                let matchNum = 1;
-                for (const match of data) {
-                    addTournamentMatch(tournamentId, matchNum, match.a, match.b);
-                    matchNum++;
-                }
+                openTournamentFromBracket(interaction.user.id, interaction.guild.id, name, data);
 
                 await interaction.editReply(`Successfully opened tournament **${name}** with ${data.length} matches. Betting is now open!`);
             } catch (err: any) {
@@ -134,7 +137,7 @@ export const tournamentCommand = {
             let desc = '';
             for (const m of matches) {
                 const status = m.winner ? `🏆 Winner: ${m.winner}` : (m.bettingOpen ? '🟢 Betting Open' : '🔴 Betting Closed');
-                desc += `**Match #${m.matchNumber}**: ${m.contestantA} vs ${m.contestantB}\n└ Status: ${status}\n`;
+                desc += `**${formatMatchLabel(m)}**\n└ Status: ${status}\n`;
 
                 const bets = getBetsForMatch(activeTournament.id, m.id);
                 desc += `└ Bets Placed: **${bets.length}**\n\n`;
@@ -157,7 +160,7 @@ export const tournamentCommand = {
 
             for (const m of matches) {
                 select.addOptions({
-                    label: `Match #${m.matchNumber}: ${m.contestantA} vs ${m.contestantB}`,
+                    label: formatMatchLabel(m).slice(0, 100),
                     value: m.id.toString(),
                 });
             }
@@ -190,7 +193,7 @@ export const tournamentCommand = {
                 else if (b.status === 'lost') statusInfo = '❌ Lost';
                 else if (b.status === 'refunded') statusInfo = '↩️ Refunded';
 
-                desc += `**Match #${b.matchNumber}**: ${b.contestantA} vs ${b.contestantB}\n`;
+                desc += `**${formatMatchLabel(b)}**\n`;
                 desc += `└ Picked: **${b.picked}** | Amount: **${b.amount}** | ${statusInfo}\n\n`;
             }
 
@@ -207,119 +210,31 @@ export const tournamentCommand = {
 
             if (closeAll) {
                 await interaction.deferReply();
-                const matches = getTournamentMatches(activeTournament.id);
-                let closedCount = 0;
-                for (const m of matches) {
-                    if (m.bettingOpen) {
-                        closeBettingForMatch(m.id);
-                        closedCount++;
-                    }
-                }
+                const closedCount = closeAllTournamentMatches(interaction.user.id, interaction.guild.id);
                 await interaction.editReply(`🔒 Betting has been **closed** for all ${closedCount} open matches! No more bets can be placed.`);
                 return;
             }
 
-            const match = getMatchByNumber(activeTournament.id, matchNumber);
-
-            if (!match) {
-                await interaction.reply({ content: 'Match not found in the current tournament.', ephemeral: true });
-                return;
-            }
-
-            if (!match.bettingOpen) {
-                await interaction.reply({ content: 'Betting is already closed for this match.', ephemeral: true });
-                return;
-            }
-
             await interaction.deferReply();
-            closeBettingForMatch(match.id);
-            await interaction.editReply(`🔒 Betting has been **closed** for Match #${match.matchNumber} (${match.contestantA} vs ${match.contestantB})! No more bets can be placed.`);
+            const match = closeTournamentMatch(interaction.user.id, interaction.guild.id, matchNumber);
+            await interaction.editReply(`🔒 Betting has been **closed** for ${formatMatchLabel(match)}! No more bets can be placed.`);
         } else if (subcommand === 'resolve') {
             const matchNumber = options.getInteger('match_number');
             const winnerRaw = options.getString('winner');
-            const match = getMatchByNumber(activeTournament.id, matchNumber);
-
-            if (!match) {
-                await interaction.reply({ content: 'Match not found in the current tournament.', ephemeral: true });
-                return;
-            }
-
-            if (match.winner) {
-                await interaction.reply({ content: 'Match is already resolved.', ephemeral: true });
-                return;
-            }
-
-            let winner = null;
-            if (winnerRaw.toLowerCase() === match.contestantA.toLowerCase()) winner = match.contestantA;
-            else if (winnerRaw.toLowerCase() === match.contestantB.toLowerCase()) winner = match.contestantB;
-
-            if (!winner) {
-                await interaction.reply({ content: `Invalid winner. Must be exactly "${match.contestantA}" or "${match.contestantB}".`, ephemeral: true });
-                return;
-            }
-
             await interaction.deferReply();
-            const summary = resolveMatch(activeTournament.id, match.id, winner);
-
-            if (!summary) {
-                await interaction.editReply('Error resolving match.');
-                return;
-            }
-
-            const bets = getBetsForMatch(activeTournament.id, match.id);
-            let poolA = 0;
-            let poolB = 0;
-
-            for (const b of bets) {
-                if (b.picked === match.contestantA) poolA += b.amount;
-                else if (b.picked === match.contestantB) poolB += b.amount;
-            }
-
-            const totalPool = poolA + poolB;
-            const payoutA = totalPool > 0 && poolA > 0 ? (totalPool / poolA).toFixed(2) : '1.00';
-            const payoutB = totalPool > 0 && poolB > 0 ? (totalPool / poolB).toFixed(2) : '1.00';
-            const pctA = totalPool > 0 ? Math.round((poolA / totalPool) * 100) : 0;
-            const pctB = totalPool > 0 ? Math.round((poolB / totalPool) * 100) : 0;
-
-            let desc = `**Match #${match.matchNumber}**: ${match.contestantA} vs ${match.contestantB}\n`;
-            desc += `🏆 **Winner: ${winner}**\n\n`;
-            desc += `**Final Pool Breakdown:**\n`;
-            desc += `**${match.contestantA}**: ${poolA} (${pctA}%) — final payout: **${payoutA}x**\n`;
-            desc += `**${match.contestantB}**: ${poolB} (${pctB}%) — final payout: **${payoutB}x**\n`;
-            desc += `Total Pool: **${summary.totalPool}** MugCoins\n`;
-
-            if (summary.payouts.length > 0) {
-                desc += `\n**Top Payouts:**\n`;
-                const sorted = summary.payouts.sort((a: any, b: any) => b.payout - a.payout).slice(0, 5);
-                for (const p of sorted) {
-                    desc += `<@${p.userId}>: +${p.payout} MugCoins\n`;
-                }
-                if (summary.payouts.length > 5) {
-                    desc += `*...and ${summary.payouts.length - 5} more winners*`;
-                }
-            } else {
-                desc += '\n*No one bet on the winner.*';
-            }
-
-            const embed = new EmbedBuilder()
-                .setColor(0xffcc00)
-                .setTitle(`Match Resolved!`)
-                .setDescription(desc);
-
-            await interaction.editReply({ embeds: [embed] });
-
-            // Auto-end tournament if all matches are resolved
-            const allMatches = getTournamentMatches(activeTournament.id);
-            const allResolved = allMatches.every(m => m.winner !== null);
-
-            if (allResolved) {
-                endTournament(activeTournament.id);
-                await interaction.followUp(`**All matches have been resolved!** The tournament **${activeTournament.name}** has automatically ended.`);
+            const result = resolveTournamentMatch(interaction.user.id, interaction.guild.id, matchNumber, winnerRaw!);
+            await interaction.editReply(`🏆 ${formatMatchLabel(result.match)} resolved. Winner: **${result.winner}**.`);
+            if (result.tournamentEnded) {
+                await interaction.followUp(`**All matches have been resolved!** The tournament **${result.tournamentName}** has automatically ended.`);
             }
         } else if (subcommand === 'end') {
             await interaction.deferReply();
-            endTournament(activeTournament.id);
+            completeTournament(interaction.user.id, interaction.guild.id);
             await interaction.editReply(`Tournament **${activeTournament.name}** has been marked as completed. Pending bets have been refunded.`);
+        } else if (subcommand === 'advance') {
+            await interaction.deferReply();
+            const result = advanceTournamentRound(interaction.user.id, interaction.guild.id);
+            await interaction.editReply(`Advanced to round **${result.roundNumber}** with **${result.matchCount}** matches.`);
         }
     }
 };
@@ -363,12 +278,12 @@ export async function handleSelectMatch(interaction: StringSelectMenuInteraction
         const embed = new EmbedBuilder()
             .setColor(0xe74c3c)
             .setTitle(`Betting Panel: ${activeTournament.name}`)
-            .setDescription(`You have already placed a bet on Match #${match.matchNumber}. You cannot change it.`);
+            .setDescription(`You have already placed a bet on ${formatMatchLabel(match)}. You cannot change it.`);
         await interaction.update({ embeds: [embed], components: [] });
         return;
     }
 
-    let desc = `**Match #${match.matchNumber}**: ${match.contestantA} vs ${match.contestantB}\n\n`;
+    let desc = `**${formatMatchLabel(match)}**\n\n`;
     desc += `Your balance: **${balance}** MugCoins\n\n`;
     desc += `*Odds and pool sizes are hidden until the match is resolved.*`;
 
@@ -449,16 +364,16 @@ export async function handleBetSubmit(interaction: ModalSubmitInteraction) {
 
     const pickedContestant = pickLetter === 'a' ? match.contestantA : match.contestantB;
 
-    const success = placeBet(activeTournament.id, matchId, interaction.user.id, interaction.guildId!, pickedContestant, amount);
-
-    if (!success) {
+    try {
+        placeTournamentBet(interaction.guildId!, interaction.user.id, matchId, pickedContestant, amount);
+    } catch {
         await interaction.reply({ content: 'Bet failed. You may not have enough MugCoins, or you already placed a bet on this match.', ephemeral: true });
         return;
     }
 
     const balance = getBalance(interaction.user.id, interaction.guildId!);
     let desc = `✅ **Bet Placed!**\n\n`;
-    desc += `**Match #${match.matchNumber}**: ${match.contestantA} vs ${match.contestantB}\n`;
+    desc += `**${formatMatchLabel(match)}**\n`;
     desc += `Your pick: **${pickedContestant}**\n`;
     desc += `Amount: **${amount}** MugCoins\n`;
     desc += `Remaining balance: **${balance}** MugCoins\n\n`;

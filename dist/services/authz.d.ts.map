@@ -1,0 +1,1 @@
+{"version":3,"file":"authz.d.ts","sourceRoot":"","sources":["../../src/services/authz.ts"],"names":[],"mappings":"AAEA,MAAM,MAAM,QAAQ,GAAG,MAAM,GAAG,UAAU,GAAG,OAAO,CAAC;AAErD,wBAAgB,WAAW,CAAC,MAAM,EAAE,MAAM,GAAG,QAAQ,CAIpD;AAED,wBAAgB,oBAAoB,CAAC,MAAM,EAAE,MAAM,GAAG,OAAO,CAE5D;AAED,wBAAgB,gBAAgB,CAAC,MAAM,EAAE,MAAM,GAAG,OAAO,CAExD"}

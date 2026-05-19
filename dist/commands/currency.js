@@ -131,7 +131,7 @@ exports.currencyCommand = {
                 await interaction.reply({ content: 'Insufficient funds.', ephemeral: true });
                 return;
             }
-            await interaction.reply(`💸 **${interaction.user.username}** has sent **${amount}** MugCoins to **${targetUser.username}**!`);
+            await interaction.reply(`**${interaction.user.username}** has sent **${amount}** MugCoins to **${targetUser.username}**!`);
         }
     }
 };

@@ -1,0 +1,146 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #eef2f6;
+  color: #152033;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; }
+button, .primary {
+  border: 0;
+  border-radius: 6px;
+  background: #1769e0;
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.ghost { background: #e6ecf3; color: #1d2a3d; }
+button.danger { background: #c7293d; }
+input, select, textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px 11px;
+  background: #fff;
+  color: #142033;
+  width: 100%;
+}
+textarea { resize: vertical; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+th { color: #516070; font-size: 12px; text-transform: uppercase; letter-spacing: 0; background: #f7fafc; }
+h1, h2, h3, p { margin-top: 0; }
+
+.app { min-height: 100vh; display: grid; grid-template-columns: 248px 1fr; }
+.sidebar {
+  background: #111827;
+  color: #dbe5f0;
+  padding: 18px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800; margin: 0 8px 20px; }
+.brand img, .loginMark { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
+.sidebar nav { display: grid; gap: 4px; }
+.sidebar a { border-radius: 6px; padding: 10px 12px; color: #b9c6d4; font-weight: 650; }
+.sidebar a.active, .sidebar a:hover { background: #243244; color: #fff; }
+.main { min-width: 0; }
+.topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 0 24px;
+  background: #fff;
+  border-bottom: 1px solid #dbe3ec;
+}
+.topbar div { display: grid; text-align: right; line-height: 1.25; }
+.topbar span { color: #6b7888; font-size: 13px; text-transform: capitalize; }
+.page { padding: 24px; max-width: 1440px; margin: 0 auto; width: 100%; }
+.pageTitle { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.pageTitle h1 { font-size: 28px; margin-bottom: 4px; letter-spacing: 0; }
+.pageTitle p, .muted { color: #64748b; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stat, .section, .matchCard {
+  background: #fff;
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgba(15, 23, 42, .03);
+}
+.stat { padding: 16px; display: grid; gap: 8px; min-width: 0; }
+.stat span { color: #617084; font-size: 13px; }
+.stat strong { font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+.section { padding: 16px; margin-bottom: 18px; }
+.section h2 { font-size: 17px; margin-bottom: 12px; }
+.matchGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.matchGrid.compact { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.matchGrid.operatorGrid { grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); }
+.matchCard { padding: 14px; }
+.matchCard h3 { font-size: 17px; margin: 10px 0 8px; overflow-wrap: anywhere; }
+.matchCard small { color: #7a8796; font-size: 12px; text-transform: uppercase; }
+.cardHead, .actions, .pager, .formRow, .inlineForm, .filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.operatorActions { margin-bottom: 18px; }
+.cardHead { justify-content: space-between; }
+.cardHead span { font-weight: 800; color: #3b4b61; }
+.badge { border-radius: 999px; padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+.badge.open { background: #d9f99d; color: #365314; }
+.badge.closed { background: #fef3c7; color: #92400e; }
+.badge.win { background: #dbeafe; color: #1e40af; }
+.inlineForm { align-items: stretch; }
+.inlineForm select { flex: 2 1 160px; }
+.inlineForm input { flex: 1 1 90px; }
+.inlineForm button { flex: 0 0 auto; }
+.formRow input, .formRow select { width: auto; min-width: 180px; flex: 1 1 180px; }
+.tableWrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+.empty { border: 1px dashed #b8c4d2; border-radius: 8px; padding: 28px; text-align: center; color: #667589; background: #f8fafc; }
+.error { color: #b91c1c; background: #fee2e2; border-radius: 6px; padding: 8px 10px; }
+.pager { justify-content: flex-end; margin-top: 12px; }
+.split, .twoCol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.filters { margin-bottom: 14px; }
+.filters input { max-width: 280px; }
+.loginPage, .centerState {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #111827;
+  padding: 24px;
+}
+.loginPanel {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 8px;
+  padding: 28px;
+  border: 1px solid #dbe3ec;
+}
+.loginPanel h1 { font-size: 30px; margin-bottom: 10px; }
+.eyebrow { color: #1769e0; font-size: 12px; text-transform: uppercase; font-weight: 800; letter-spacing: 0; margin: 12px 0 8px; }
+.wide { width: 100%; margin-top: 12px; }
+.centerState { color: #dbe5f0; font-weight: 700; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .sidebar nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topbar { justify-content: space-between; padding: 0 16px; }
+  .topbar div { text-align: left; }
+  .page { padding: 16px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split, .twoCol { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .stats, .matchGrid, .matchGrid.compact, .matchGrid.operatorGrid { grid-template-columns: 1fr; }
+  .sidebar nav { grid-template-columns: 1fr; }
+  .formRow input, .formRow select, .formRow button, .inlineForm button { width: 100%; flex-basis: 100%; }
+  .pageTitle h1 { font-size: 24px; }
+}

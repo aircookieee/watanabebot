@@ -4,6 +4,7 @@ import { initDatabase } from './database/db';
 import * as ready from './events/ready';
 import * as messageCreate from './events/messageCreate';
 import * as interactionCreate from './events/interactionCreate';
+import { startWebServer } from './web/server';
 
 export const client = new Client({
     intents: [
@@ -80,6 +81,8 @@ async function deployCommands() {
 async function main() {
     console.log('Initializing database...');
     await initDatabase();
+
+    await startWebServer(client);
 
     await deployCommands();
 

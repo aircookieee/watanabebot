@@ -28,12 +28,20 @@ exports.spendCurrency = spendCurrency;
 exports.setBalance = setBalance;
 exports.transferCurrency = transferCurrency;
 exports.getLeaderboard = getLeaderboard;
+exports.getWalletTransactions = getWalletTransactions;
+exports.addAuditLog = addAuditLog;
+exports.getAuditLogs = getAuditLogs;
+exports.saveWebSession = saveWebSession;
+exports.getWebSession = getWebSession;
+exports.deleteWebSession = deleteWebSession;
 exports.createTournament = createTournament;
 exports.addTournamentMatch = addTournamentMatch;
 exports.getActiveTournament = getActiveTournament;
 exports.getTournamentMatches = getTournamentMatches;
 exports.getMatch = getMatch;
 exports.getMatchByNumber = getMatchByNumber;
+exports.getCurrentRoundNumber = getCurrentRoundNumber;
+exports.createNextRoundFromWinners = createNextRoundFromWinners;
 exports.closeBettingForMatch = closeBettingForMatch;
 exports.placeBet = placeBet;
 exports.getBetsForMatch = getBetsForMatch;
@@ -105,6 +113,18 @@ function initializeTables() {
         )
     `);
     db.run(`
+        CREATE TABLE IF NOT EXISTS web_sessions (
+            sid TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            username TEXT NOT NULL,
+            guild_member INTEGER NOT NULL DEFAULT 1,
+            csrf_token TEXT NOT NULL,
+            bracket_preview TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    db.run(`
         CREATE TABLE IF NOT EXISTS user_media_lists (
             discord_id TEXT NOT NULL,
             media_id INTEGER NOT NULL,
@@ -153,6 +173,17 @@ function initializeTables() {
         )
     `);
     db.run(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_user_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_id TEXT,
+            metadata TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    db.run(`
         CREATE TABLE IF NOT EXISTS tournaments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             guild_id TEXT NOT NULL,
@@ -162,10 +193,22 @@ function initializeTables() {
         )
     `);
     db.run(`
+        CREATE TABLE IF NOT EXISTS tournament_rounds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER NOT NULL,
+            round_number INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tournament_id, round_number),
+            FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
+        )
+    `);
+    db.run(`
         CREATE TABLE IF NOT EXISTS tournament_matches (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tournament_id INTEGER NOT NULL,
             match_number INTEGER NOT NULL,
+            round_number INTEGER NOT NULL DEFAULT 1,
             contestant_a TEXT NOT NULL,
             contestant_b TEXT NOT NULL,
             winner TEXT,
@@ -173,6 +216,10 @@ function initializeTables() {
             FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
         )
     `);
+    try {
+        db.run(`ALTER TABLE tournament_matches ADD COLUMN round_number INTEGER NOT NULL DEFAULT 1`);
+    }
+    catch { }
     db.run(`
         CREATE TABLE IF NOT EXISTS bets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -511,19 +558,97 @@ function getLeaderboard(guildId, limit) {
     }
     return leaderboard;
 }
+function getWalletTransactions(guildId, userId, limit = 50) {
+    if (!db)
+        return [];
+    const result = userId
+        ? db.exec(`SELECT id, user_id, amount, reason, reference_id, balance_after, created_at FROM wallet_transactions WHERE guild_id = ? AND user_id = ? ORDER BY id DESC LIMIT ?`, [guildId, userId, limit])
+        : db.exec(`SELECT id, user_id, amount, reason, reference_id, balance_after, created_at FROM wallet_transactions WHERE guild_id = ? ORDER BY id DESC LIMIT ?`, [guildId, limit]);
+    const rows = [];
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            rows.push({
+                id: row[0],
+                userId: row[1],
+                amount: row[2],
+                reason: row[3],
+                referenceId: row[4] ?? null,
+                balanceAfter: row[5],
+                createdAt: row[6],
+            });
+        }
+    }
+    return rows;
+}
+function addAuditLog(actorUserId, action, targetType, targetId = null, metadata = {}) {
+    if (!db)
+        return;
+    db.run(`INSERT INTO audit_log (actor_user_id, action, target_type, target_id, metadata) VALUES (?, ?, ?, ?, ?)`, [actorUserId, action, targetType, targetId, JSON.stringify(metadata)]);
+    saveDatabase();
+}
+function getAuditLogs(limit = 100) {
+    if (!db)
+        return [];
+    const result = db.exec(`SELECT id, actor_user_id, action, target_type, target_id, metadata, created_at FROM audit_log ORDER BY id DESC LIMIT ?`, [limit]);
+    const logs = [];
+    if (result.length > 0 && result[0].values.length > 0) {
+        for (const row of result[0].values) {
+            logs.push({
+                id: row[0],
+                actorUserId: row[1],
+                action: row[2],
+                targetType: row[3],
+                targetId: row[4] ?? null,
+                metadata: row[5] ?? null,
+                createdAt: row[6],
+            });
+        }
+    }
+    return logs;
+}
+function saveWebSession(sid, userId, username, guildMember, csrfToken, bracketPreview = null) {
+    if (!db)
+        return;
+    db.run(`INSERT OR REPLACE INTO web_sessions (sid, user_id, username, guild_member, csrf_token, bracket_preview, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`, [sid, userId, username, guildMember ? 1 : 0, csrfToken, bracketPreview]);
+    saveDatabase();
+}
+function getWebSession(sid) {
+    if (!db)
+        return null;
+    const result = db.exec(`SELECT user_id, username, guild_member, csrf_token, bracket_preview FROM web_sessions WHERE sid = ?`, [sid]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        const row = result[0].values[0];
+        return {
+            userId: row[0],
+            username: row[1],
+            guildMember: row[2] === 1,
+            csrfToken: row[3],
+            bracketPreview: row[4] ?? null,
+        };
+    }
+    return null;
+}
+function deleteWebSession(sid) {
+    if (!db)
+        return;
+    db.run(`DELETE FROM web_sessions WHERE sid = ?`, [sid]);
+    saveDatabase();
+}
 // Tournament Functions
 function createTournament(guildId, name) {
     if (!db)
         return null;
     db.run(`INSERT INTO tournaments (guild_id, name) VALUES (?, ?)`, [guildId, name]);
     const result = db.exec(`SELECT last_insert_rowid()`);
+    const tournamentId = result[0].values[0][0];
+    db.run(`INSERT INTO tournament_rounds (tournament_id, round_number, status) VALUES (?, 1, 'active')`, [tournamentId]);
     saveDatabase();
-    return result[0].values[0][0];
+    return tournamentId;
 }
-function addTournamentMatch(tournamentId, matchNum, contestantA, contestantB) {
+function addTournamentMatch(tournamentId, matchNum, contestantA, contestantB, roundNumber = 1) {
     if (!db)
         return;
-    db.run(`INSERT INTO tournament_matches (tournament_id, match_number, contestant_a, contestant_b) VALUES (?, ?, ?, ?)`, [tournamentId, matchNum, contestantA, contestantB]);
+    db.run(`INSERT INTO tournament_matches (tournament_id, match_number, round_number, contestant_a, contestant_b) VALUES (?, ?, ?, ?, ?)`, [tournamentId, matchNum, roundNumber, contestantA, contestantB]);
     saveDatabase();
 }
 function getActiveTournament(guildId) {
@@ -538,20 +663,25 @@ function getActiveTournament(guildId) {
     }
     return null;
 }
-function getTournamentMatches(tournamentId) {
+function getTournamentMatches(tournamentId, roundNumber) {
     if (!db)
         return [];
-    const result = db.exec(`SELECT id, match_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? ORDER BY match_number ASC`, [tournamentId]);
+    const query = roundNumber == null
+        ? `SELECT id, match_number, round_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? ORDER BY round_number ASC, match_number ASC`
+        : `SELECT id, match_number, round_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? AND round_number = ? ORDER BY match_number ASC`;
+    const params = roundNumber == null ? [tournamentId] : [tournamentId, roundNumber];
+    const result = db.exec(query, params);
     const matches = [];
     if (result.length > 0 && result[0].values.length > 0) {
         for (const row of result[0].values) {
             matches.push({
                 id: row[0],
                 matchNumber: row[1],
-                contestantA: row[2],
-                contestantB: row[3],
-                winner: row[4],
-                bettingOpen: row[5] === 1,
+                roundNumber: row[2],
+                contestantA: row[3],
+                contestantB: row[4],
+                winner: row[5],
+                bettingOpen: row[6] === 1,
             });
         }
     }
@@ -560,13 +690,33 @@ function getTournamentMatches(tournamentId) {
 function getMatch(matchId) {
     if (!db)
         return null;
-    const result = db.exec(`SELECT tournament_id, match_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE id = ?`, [matchId]);
+    const result = db.exec(`SELECT tournament_id, match_number, round_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE id = ?`, [matchId]);
     if (result.length > 0 && result[0].values.length > 0) {
         const row = result[0].values[0];
         return {
             id: matchId,
             tournamentId: row[0],
             matchNumber: row[1],
+            roundNumber: row[2],
+            contestantA: row[3],
+            contestantB: row[4],
+            winner: row[5],
+            bettingOpen: row[6] === 1,
+        };
+    }
+    return null;
+}
+function getMatchByNumber(tournamentId, matchNumber) {
+    if (!db)
+        return null;
+    const result = db.exec(`SELECT id, round_number, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? AND match_number = ? ORDER BY round_number DESC LIMIT 1`, [tournamentId, matchNumber]);
+    if (result.length > 0 && result[0].values.length > 0) {
+        const row = result[0].values[0];
+        return {
+            id: row[0],
+            tournamentId: tournamentId,
+            matchNumber: matchNumber,
+            roundNumber: row[1],
             contestantA: row[2],
             contestantB: row[3],
             winner: row[4],
@@ -575,23 +725,44 @@ function getMatch(matchId) {
     }
     return null;
 }
-function getMatchByNumber(tournamentId, matchNumber) {
+function getCurrentRoundNumber(tournamentId) {
     if (!db)
-        return null;
-    const result = db.exec(`SELECT id, contestant_a, contestant_b, winner, betting_open FROM tournament_matches WHERE tournament_id = ? AND match_number = ?`, [tournamentId, matchNumber]);
-    if (result.length > 0 && result[0].values.length > 0) {
-        const row = result[0].values[0];
-        return {
-            id: row[0],
-            tournamentId: tournamentId,
-            matchNumber: matchNumber,
-            contestantA: row[1],
-            contestantB: row[2],
-            winner: row[3],
-            bettingOpen: row[4] === 1,
-        };
+        return 1;
+    const result = db.exec(`SELECT COALESCE(MAX(round_number), 1) FROM tournament_matches WHERE tournament_id = ?`, [tournamentId]);
+    return result[0]?.values?.[0]?.[0] || 1;
+}
+function createNextRoundFromWinners(tournamentId) {
+    if (!db)
+        throw new Error('Database unavailable.');
+    const currentRound = getCurrentRoundNumber(tournamentId);
+    const currentMatches = getTournamentMatches(tournamentId, currentRound);
+    if (currentMatches.length === 0) {
+        throw new Error('No matches found in the current round.');
     }
-    return null;
+    if (!currentMatches.every(match => !!match.winner)) {
+        throw new Error('All matches in the current round must be resolved before advancing.');
+    }
+    if (currentMatches.length < 2) {
+        throw new Error('No further round can be created from a single resolved match.');
+    }
+    const nextRound = currentRound + 1;
+    const existingNext = getTournamentMatches(tournamentId, nextRound);
+    if (existingNext.length > 0) {
+        throw new Error('The next round has already been created.');
+    }
+    const winners = currentMatches.map(match => match.winner);
+    if (winners.length % 2 !== 0) {
+        throw new Error('Winner count must be even to advance the round.');
+    }
+    db.run(`INSERT OR REPLACE INTO tournament_rounds (tournament_id, round_number, status) VALUES (?, ?, 'completed')`, [tournamentId, currentRound]);
+    db.run(`INSERT OR REPLACE INTO tournament_rounds (tournament_id, round_number, status) VALUES (?, ?, 'active')`, [tournamentId, nextRound]);
+    let nextMatchNumber = 1;
+    for (let i = 0; i < winners.length; i += 2) {
+        addTournamentMatch(tournamentId, nextMatchNumber, winners[i], winners[i + 1], nextRound);
+        nextMatchNumber++;
+    }
+    saveDatabase();
+    return { roundNumber: nextRound, matchCount: winners.length / 2 };
 }
 function closeBettingForMatch(matchId) {
     if (!db)

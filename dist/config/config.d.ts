@@ -3,6 +3,8 @@ export declare const config: {
         token: string;
         clientId: string;
         guildId: string;
+        oauthClientSecret: string;
+        oauthRedirectUri: string;
     };
     anilist: {
         apiUrl: string;
@@ -22,6 +24,7 @@ export declare const config: {
         musicartWebhookId: string;
         loveLiveMusicChannelId: string;
         dailyFactsChannelId: string;
+        tournamentUpdatesChannelId: string;
     };
     paths: {
         dataDir: string;
@@ -42,6 +45,12 @@ export declare const config: {
     };
     tournament: {
         operatorId: string;
+    };
+    web: {
+        port: number;
+        baseUrl: string;
+        sessionSecret: string;
+        faviconPath: string;
     };
 };
 export default config;

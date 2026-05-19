@@ -43,6 +43,7 @@ const db_1 = require("./database/db");
 const ready = __importStar(require("./events/ready"));
 const messageCreate = __importStar(require("./events/messageCreate"));
 const interactionCreate = __importStar(require("./events/interactionCreate"));
+const server_1 = require("./web/server");
 exports.client = new discord_js_1.Client({
     intents: [
         discord_js_1.GatewayIntentBits.Guilds,
@@ -108,6 +109,7 @@ async function deployCommands() {
 async function main() {
     console.log('Initializing database...');
     await (0, db_1.initDatabase)();
+    await (0, server_1.startWebServer)(exports.client);
     await deployCommands();
     console.log('Logging in...');
     await exports.client.login(config_1.default.discord.token);

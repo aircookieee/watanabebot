@@ -115,9 +115,10 @@ export interface TournamentMatch {
     id: number;
     tournamentId: number;
     matchNumber: number;
+    roundNumber: number;
     contestantA: string;
     contestantB: string;
-    winner: 'a' | 'b' | null;
+    winner: string | null;
     bettingOpen: boolean;
 }
 
@@ -127,9 +128,9 @@ export interface Bet {
     matchId: number;
     userId: string;
     guildId: string;
-    picked: 'a' | 'b';
+    picked: string;
     amount: number;
-    status: 'pending' | 'won' | 'lost';
+    status: 'pending' | 'won' | 'lost' | 'refunded';
     payout: number;
 }
 
